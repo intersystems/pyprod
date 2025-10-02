@@ -1,0 +1,10 @@
+[project]
+name = "intersystems_pyprod"
+version = "1.0.0b1"
+authors = [
+  { name="Geet Kalra", email="geetkalra@intersystems.com" },
+]
+
+
+[project.scripts]
+intersystems_pyprod = "intersystems_pyprod._parser:main"
