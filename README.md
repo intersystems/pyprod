@@ -3,8 +3,15 @@
 intersystems_pyprod is a library that allows you to create different components for the InterSystems Productions Framework, purely in python.
 
 
+<div align="center"><img src="./docs/HelloWorldFiles/SystemDiagramOfProductions.png" alt="alt text" width="700"/></div>
+
+You can [watch a short demo](https://www.youtube.com/watch?v=TJ5zf3FsqjA) that goes over the key aspects of productions and how this library helps capture them. Also, the video gives a quick overview of the debugging workflow. 
+
+
 ## Example
 The following is a Business Process written using intersystems_pyprod. It just returns the request it receives back to the sender.
+
+First follow [steps to setup environment variables](./docs/installing.md) to connect to a running iris instance.
 
 ```python
 # save this as HelloWorld.py
@@ -19,7 +26,7 @@ class HelloWorldBP(BusinessProcess):
 The following assumes you have set the environment variables.
 
 ```bash
-$ intersystems_pyprod HelloWorld.py
+$ intersystems_pyprod /full/path/to/HelloWorld.py
 
     Loading HelloWorldBP to IRIS...
     ...
@@ -27,12 +34,14 @@ $ intersystems_pyprod HelloWorld.py
     Load finished successfully.
 ```
 
-Create the production using the UI. Add targets and other settings for the service and operation (file path to pick up the txt files):
 
+Create a production using the UI
 
 <div align="center"><img src="./docs/HelloWorldFiles/HelloWorldProductionSetup.png" alt="alt text" width="700"/></div>
 
-Start the Production and see the results
+This production reads in a file from a defined path and then forwards it to a target business process. We use a pre-existing Business Service called Enslib.File.PassthroughService. We set a path from where it reads in the file. Then we select the Business Process that we created as its target. Note, the Business Process has the name of the script (HelloWorld) appended to it. Read more about package names [here](./docs/quickstart.md#step-2-package-name). 
+
+Start the Production add then add a text file at the file path defined for the business service. Upon refreshing the production page, we can see the messages that were deliverd. 
 
 <div align="center"><img src="./docs/HelloWorldFiles/HelloWorldResults.png" alt="alt text" width="700"/></div>
 
@@ -47,3 +56,7 @@ Please report issues via GitHub Issues.
 ## Contributing
 
 Contributions are welcome. Please submit changes via Pull Requests. 
+
+## Useful links
+
+[Installing](./docs/installing.md)
