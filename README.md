@@ -60,3 +60,5 @@ Contributions are welcome. Please submit changes via Pull Requests.
 ## Useful links
 
 [Installing](./docs/installing.md)
+
+[Quick Start](./docs/quickstart.md)
