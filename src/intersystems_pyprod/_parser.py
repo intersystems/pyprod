@@ -418,9 +418,14 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
             props.append(f"/// {desc}")
 
         # build the Property line
-        line = f"Property {prop_name} As {DATATYPE_MAP.get(dtype, '%VarString')}"
+        datatype = DATATYPE_MAP.get(dtype, '%VarString')
+        line = f"Property {prop_name} As {datatype}"
         if default is not None:
-            line += f" [InitialExpression = {default}]"
+            if datatype == "%VarString":
+                line += f' [InitialExpression = "{default}"]'
+            else:
+                line += f" [InitialExpression = {default}]"
+
 
         line += "; \n"
         props.append(line)
