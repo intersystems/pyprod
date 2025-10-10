@@ -240,7 +240,7 @@ class BaseClass:
     def __init__(self, iris_host_object):
         self.iris_host_object = iris_host_object
 
-    def createmessage(self, message_object, *args, **kwargs):
+    def _createmessage(self, message_object, *args, **kwargs):
         try:
             module_name = message_object.__class__.__module__[
                 5:
@@ -340,12 +340,12 @@ class BusinessService(BaseClass):
             if response_value != None:
                 return (
                     status,
-                    self.request_to_send(response_value),
+                    self._createmessage(message_object=response_value),
                     sendSyncHandling_value,
                 )
         else:
             if response_value != None:
-                return status, self.request_to_send(response_value)
+                return status, self._createmessage(message_object=response_value)
             else:
                 return status
 
@@ -369,7 +369,7 @@ class BusinessProcess(BaseClass):
         pass
 
     def OnRequestHelper(self, request):
-        python_request = self.createmessage(message_object=request)
+        python_request = self._createmessage(message_object=request)
         result = self.OnRequest(python_request)
         if isinstance(result, (tuple, list)):
             status, response = result
@@ -389,10 +389,10 @@ class BusinessProcess(BaseClass):
         self, request, response, callrequest, callresponse, pCompletionKey
     ):
 
-        python_request = self.createmessage(message_object=request)
-        python_response = self.createmessage(message_object=response)
-        python_callrequest = self.createmessage(message_object=callrequest)
-        python_callresponse = self.createmessage(message_object=callresponse)
+        python_request = self._createmessage(message_object=request)
+        python_response = self._createmessage(message_object=response)
+        python_callrequest = self._createmessage(message_object=callrequest)
+        python_callresponse = self._createmessage(message_object=callresponse)
 
         result = self.OnResponse(
             python_request,
@@ -447,7 +447,7 @@ class BusinessProcess(BaseClass):
         del pResponse
 
         if response_value != None:
-            return status, self.request_to_send(response_value)
+            return status, self._createmessage(message_object=response_value)
         else:
             return status
 
@@ -464,7 +464,7 @@ class BusinessOperation(BaseClass):
 
     def OnMessageHelper(self, request, response):
         # debug_host("192.168.1.48",5549)
-        python_request = self.createmessage(message_object=request)
+        python_request = self._createmessage(message_object=request)
 
         result = self.OnMessage(python_request)
 
@@ -482,7 +482,7 @@ class BusinessOperation(BaseClass):
             return {"status": status, "response_available": 0}
 
     def AnyMethodHelper(self, request, methodName):
-        python_request = self.createmessage(message_object=request)
+        python_request = self._createmessage(message_object=request)
         result = getattr(self, methodName)(python_request)
         if isinstance(result, (tuple, list)):
             status, response = result
@@ -512,7 +512,7 @@ class BusinessOperation(BaseClass):
         del pResponse
 
         if response_value != None:
-            return status, self.request_to_send(response_value)
+            return status, self._createmessage(message_object=response_value)
         else:
             return status
 
