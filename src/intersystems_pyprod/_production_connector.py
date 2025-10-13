@@ -242,9 +242,9 @@ class BaseClass:
 
     def _createmessage(self, message_object, *args, **kwargs):
         try:
-            module_name = message_object.__class__.__module__[
-                5:
-            ]  # this removes iris. which is in front of the incoming class name from iris backend
+            
+            # this removes iris. which is in front of the incoming class name from iris backend
+            module_name = message_object.__class__.__module__[5:]  
             class_name = message_object.__class__.__name__
             saved_class_name = module_name + "." + class_name
             if saved_class_name not in _ProductionMessage_registry:
@@ -253,7 +253,7 @@ class BaseClass:
 
             MsgCls = _ProductionMessage_registry[module_name + "." + class_name]
             if issubclass(MsgCls, PickleSerialize):
-                return unpickle_binary(message_object)
+                return unpickle_binary(message_object,MsgCls)
 
         except KeyError:
             raise LookupError(f"No messageclass named {class_name!r} registered")
@@ -638,7 +638,7 @@ class ProductionMessage:
         # Cache it on the class object, in the class’s internal __dict__, for instant lookup later:
         cls._package = pkg
         cls._fullname = cls._package + "." + cls.__name__
-        cls._field_names = cls._class_body_field_order_top_level()
+        cls._field_names, cls._column_field_names = cls._class_body_field_order_top_level()
         # register every user subclass by its __name__. This is later used in Host classes for
         # generating objects dynamically at runtime based on incoming message type...
         _ProductionMessage_registry[cls._fullname] = cls
@@ -670,23 +670,30 @@ class ProductionMessage:
         # 2) Build map of passed-in values
         values = {}
         if iris_message_object is not None:
-            if serializer != "pickle":
-                # building using iris_message_object and json_str_or_dict. This is primarily to be used by IRIS side.
-                data = (
-                    json_str_or_dict
-                    if isinstance(json_str_or_dict, dict)
-                    else __import__(serializer).loads(json_str_or_dict)
-                )
-                for name in field_names:
-                    if name in data:
-                        values[name] = data[name]
-                # 3) For each field, decide its runtime default:
-                #  Note: We do not re-instantiate defaults as we assume that the json_str_or_dict is populated as expected, and in case
-                #  there is a missing field, it is by design....
-                for name in field_names:
-                    if name in values:
-                        val = values[name]
+            # There is a case when the python type object is originating IRIS side. This happens when using testing
+            # service from the productions UI. Here, the json_str_or_dict would be empty. 
+            if json_str_or_dict == "":
+                for name in cls._column_field_names:
+                    if (val:=getattr(iris_message_object,name)) is not "":
                         setattr(self, name, val)
+            else:
+                if serializer != "pickle":
+                    # building using iris_message_object and json_str_or_dict. This is primarily to be used by IRIS side.
+                    data = (
+                        json_str_or_dict
+                        if isinstance(json_str_or_dict, dict)
+                        else __import__(serializer).loads(json_str_or_dict)
+                    )
+                    for name in field_names:
+                        if name in data:
+                            values[name] = data[name]
+                    # 3) For each field, decide its runtime default:
+                    #  Note: We do not re-instantiate defaults as we assume that the json_str_or_dict is populated as expected, and in case
+                    #  there is a missing field, it is by design....
+                    for name in field_names:
+                        if name in values:
+                            val = values[name]
+                            setattr(self, name, val)
         else:
 
             PackageName = cls._package
@@ -727,6 +734,11 @@ class ProductionMessage:
         object.__setattr__(self, "_iris_message_wrapper", iris_message_object)
         object.__setattr__(self, "_serializer", serializer)
 
+
+    @staticmethod
+    def _is_column_call(value: ast.AST) -> bool:
+        return isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id == "Column"
+
     @classmethod
     def _class_body_field_order_top_level(cls):
         """Return names in the exact order they appear in the top-level class body.
@@ -746,21 +758,27 @@ class ProductionMessage:
         if not target:
             raise RuntimeError(f"Couldn't locate class body for {cls.__name__}")
 
-        names, seen = [], set()
+        names, columns, seen = [], [], set()
         for stmt in target.body:
             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
                 n = stmt.target.id
                 if n not in seen:
+                    if stmt.value is not None and cls._is_column_call(stmt.value):
+                        columns.append(n)
                     names.append(n)
                     seen.add(n)
             elif isinstance(stmt, ast.Assign):
                 # include simple 'Name = ...' (also collects each Name in 'x = y = 0')
-                for t in stmt.targets:
-                    if isinstance(t, ast.Name) and t.id not in seen:
-                        names.append(t.id)
-                        seen.add(t.id)
+                for t in stmt.targets:                    
+                    if isinstance(t, ast.Name):
+                        name = t.id
+                        if name not in seen:
+                            if cls._is_column_call(stmt.value):
+                                columns.append(name)
+                            names.append(name)
+                            seen.add(name)
             # ignore methods, decorators, nested classes, etc.
-        return names
+        return names, columns
 
     @property
     def iris_message_object(self):
@@ -803,6 +821,7 @@ class JsonSerialize(ProductionMessage):
                 chunks.append(part)
                 iteration += 1
             json_str = "".join(chunks)
+
             json_str_or_dict = json_str
         return super().__init__(
             *args,
@@ -854,7 +873,7 @@ class JsonSerialize(ProductionMessage):
                 setattr(message_object, prop, self.__dict__[prop])
 
 
-def unpickle_binary(iris_message_object):
+def unpickle_binary(iris_message_object,MsgCls):
     if iris_message_object is not None:
 
         chunkSize = (
@@ -871,9 +890,16 @@ def unpickle_binary(iris_message_object):
 
         binary_serial_msg = b"".join(chunks)
 
-        thisobject = pickle.loads(binary_serial_msg)
-        thisobject._iris_message_wrapper = iris_message_object
+        if binary_serial_msg:
+            thisobject = pickle.loads(binary_serial_msg)
+            thisobject._iris_message_wrapper = iris_message_object
+        else: 
+            thisobject = MsgCls()
+            for name in thisobject._column_field_names:
+                if (val:=getattr(iris_message_object,name)) is not "":
+                    setattr(thisobject, name, val)
     return thisobject
+
 
 
 class PickleSerialize(ProductionMessage):
