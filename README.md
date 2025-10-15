@@ -62,3 +62,5 @@ Contributions are welcome. Please submit changes via Pull Requests.
 [Installing](./docs/installing.md)
 
 [Quick Start](./docs/quickstart.md)
+
+[Debugging](./docs/debugging.md)
