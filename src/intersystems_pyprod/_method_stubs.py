@@ -316,6 +316,21 @@ Method chunksFromIRIS(iteration As %Integer, chunkSize As %Integer = 1048576) As
     return ..SerializedStream.Read(chunkSize)
 }}
 
+Method %GetContentType() As %String
+{{
+    if ..SerializedStream.Size > 0 {{
+        Quit "application/json"
+    }}
+    Quit ##super()
+}}
+
+Method OnShowJSONContents(pZenOutput As %Boolean = 0)
+{{
+	Set tSC = $$$OK
+    Do ..OutputFormattedJSON(..SerializedStream)
+}}
+
+
 }}
 """
 ,
