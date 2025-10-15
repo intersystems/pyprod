@@ -1,6 +1,9 @@
 ## 🐞 For Debugging in containers
 
 
+https://github.com/user-attachments/assets/7df22ab7-1a42-461d-9241-521698c6da27
+
+
 You can open the `user_script.py` in local VS Code. Add the launch configuration shown below in VS Code.
 
 1. Install debugpy within the iris installation: 
