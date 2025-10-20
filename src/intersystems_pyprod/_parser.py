@@ -155,7 +155,7 @@ def generate_custom_classes( tree, script_name, folder_name, package_name, outpu
     all_classes = {}
     for cls_name, supercls, node, hostname in classes:
         # Build OnInit method
-        props_lines, settings_list = extract_props_and_settings(node, real_path)
+        props_lines, settings_list,message_map_methods = extract_props_and_settings(node, real_path)
         props_block = "\n".join(props_lines) if props_lines else ""
 
         # params = []
@@ -204,6 +204,8 @@ def generate_custom_classes( tree, script_name, folder_name, package_name, outpu
                 # Determine stub: specific stub or AnyMethod for certain superclasses
                 if name in super_stubs:
                     stub_tmpl = super_stubs[name]
+                elif (hostname is "BusinessOperation" and name not in message_map_methods):
+                    continue
                 elif (
                     hostname in ("BusinessOperation", "OutboundAdapter")
                     and "AnyMethod" in super_stubs
@@ -363,7 +365,7 @@ def message_map_xdata(MessageMap):
 
 def extract_props_and_settings(node: ast.ClassDef, real_path):
 
-    props, settings = [], []
+    props, settings, message_map_method = [], [], []
 
     for stmt in node.body:
         ann = None
@@ -383,6 +385,8 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
             }
             message_map_as_xdata_string = message_map_xdata(message_map_as_dictionary)
             props.append(message_map_as_xdata_string)
+            for msg_type, method in message_map_as_dictionary.items():
+                message_map_method.append(method)
             continue
 
         # now check it's really IRISProperty(...)
@@ -417,6 +421,7 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
         if desc:
             props.append(f"/// {desc}")
 
+
         # build the Property line
         datatype = DATATYPE_MAP.get(dtype, '%VarString')
         line = f"Property {prop_name} As {datatype}"
@@ -426,14 +431,13 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
             else:
                 line += f" [InitialExpression = {default}]"
 
-
         line += "; \n"
         props.append(line)
 
         if setting:
             settings.append(setting)
 
-    return props, settings
+    return props, settings, message_map_method
 
 
 def find_ossubclasses(tree):
@@ -458,7 +462,7 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
     all_classes = {}
     for cls_name, supercls, node in classes:
         # Build OnInit method
-        props_lines, settings_list = extract_props_and_settings(node, real_path)
+        props_lines, settings_list, message_map_methods = extract_props_and_settings(node, real_path)
         props_block = "\n".join(props_lines) if props_lines else ""
 
         # params = []
@@ -507,10 +511,13 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
                 # Determine stub: specific stub or AnyMethod for certain superclasses
                 if name in super_stubs:
                     stub_tmpl = super_stubs[name]
+                elif (supercls is "BusinessOperation" and name not in message_map_methods):
+                    continue
                 elif (
                     supercls in ("BusinessOperation", "OutboundAdapter")
                     and "AnyMethod" in super_stubs
                 ):
+
                     stub_tmpl = super_stubs["AnyMethod"]
                 else:
                     continue
