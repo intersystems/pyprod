@@ -93,7 +93,7 @@ class IRISProperty:
         https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=EGDV_prog#EGDV_prog_settings_options
     """
 
-    def __init__(self, datatype="%VarString", description="", default=None, settings=""):
+    def __init__(self, default=None, datatype="%VarString", description="", settings=""):
         self.datatype = datatype
         self.description = description
         self.default = default
@@ -150,7 +150,7 @@ class IRISParameter:
         The value for this contant.
     """
 
-    def __init__(self, value, *, description="", datatype="", keyword_list=""):
+    def __init__(self, value, datatype="", description="", keyword_list=""):
         self.value = value
         self.description = description
         self.datatype = datatype
@@ -188,7 +188,7 @@ class Column:
     """
 
     def __init__(
-        self, *, default=None, index=False, description=None, datatype=None, **kwargs
+        self, *, default=None, datatype=None, description=None, index=False, **kwargs
     ):
         self.default = default
         self.index = bool(index)

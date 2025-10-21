@@ -258,6 +258,13 @@ def generate_custom_classes( tree, script_name, folder_name, package_name, outpu
 
 # _______________________________________________________________________________________________________________________ generate_custom_classes #
 
+def eval_node(node):
+    try:
+        return ast.literal_eval(node)
+    except Exception:
+        # Fallback if it's not a literal (e.g., a Name); keep a readable string
+        return ast.unparse(node) if hasattr(ast, "unparse") else None
+            
 
 def get_args(func_node):
     args = func_node.args.args
@@ -303,15 +310,24 @@ def extract_params(node: ast.ClassDef):
         ):
             continue
 
+        
         param_name = target_node.id
 
-        # pull literal kwargs out of the call
-        kw = {a.arg: ast.literal_eval(a.value) for a in call_node.keywords}
 
-        desc = kw.get("description", None)
-        dtype = kw.get("datatype", None)
-        keyword_list = kw.get("keyword_list", None)
-        value = kw.get("value", None)
+        from_args= {}
+        IRISParameter_PARAM_ORDER = ["value", "datatype", "description", "keyword_list"]
+        for i, arg in enumerate(call_node.args):
+            if i < len(IRISParameter_PARAM_ORDER):
+                from_args[IRISParameter_PARAM_ORDER[i]] = eval_node(arg)
+
+        # pull literal kwargs out of the call
+        kw = {a.arg: eval_node(a.value) for a in call_node.keywords}
+
+        value = from_args.get("value",kw.get("value", None))
+        dtype = from_args.get("datatype",kw.get("datatype", None))
+        desc = from_args.get("description",kw.get("description", None))
+        keyword_list = from_args.get("keyword_list",kw.get("keyword_list", None))
+        
         if dtype is None and ann is not None:
             dtype = DATATYPE_MAP_Parameters.get(ast.unparse(ann))
 
@@ -363,6 +379,7 @@ def message_map_xdata(MessageMap):
     return result
 
 
+
 def extract_props_and_settings(node: ast.ClassDef, real_path):
 
     props, settings, message_map_method = [], [], []
@@ -407,13 +424,20 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
 
         prop_name = target_node.id
 
-        # pull literal kwargs out of the call
-        kw = {a.arg: ast.literal_eval(a.value) for a in call_node.keywords}
+        from_args= {}
+        IRISProperty_PARAM_ORDER = [ "default", "datatype", "description", "settings"]
+        for i, arg in enumerate(call_node.args):
+            if i < len(IRISProperty_PARAM_ORDER):
+                from_args[IRISProperty_PARAM_ORDER[i]] = eval_node(arg)
 
-        desc = kw.get("description", None)
-        dtype = kw.get("datatype", None)
-        default = kw.get("default", None)
-        setting = kw.get("settings", None)
+        # pull literal kwargs out of the call
+        kw = {a.arg: eval_node(a.value) for a in call_node.keywords}
+
+        default = from_args.get("default",kw.get("default", None))
+        dtype = from_args.get("datatype",kw.get("datatype", None))
+        desc = from_args.get("description",kw.get("description", None))
+        setting = from_args.get("settings",kw.get("settings", None))
+
         if dtype is None and ann is not None:
             dtype = ast.unparse(ann)
 
@@ -583,7 +607,7 @@ def props_and_indices_from_msg_class(node: ast.ClassDef):
         else:
             continue
 
-        # now check it's really IRISProperty(...)
+        # now check it's really Column(...)
         if not (
             isinstance(call_node, ast.Call)
             and (
@@ -598,13 +622,21 @@ def props_and_indices_from_msg_class(node: ast.ClassDef):
 
         prop_name = target_node.id
 
-        # pull literal kwargs out of the call
-        kw = {a.arg: ast.literal_eval(a.value) for a in call_node.keywords}
 
-        index = kw.get("index", None)
-        default = kw.get("default", None)
-        desc = kw.get("description", None)
-        dtype = kw.get("datatype", None)
+        from_args= {}
+        Column_PARAM_ORDER = [ "default", "datatype", "description", "index"]
+        for i, arg in enumerate(call_node.args):
+            if i < len(Column_PARAM_ORDER):
+                from_args[Column_PARAM_ORDER[i]] = eval_node(arg)
+
+        # pull literal kwargs out of the call
+        kw = {a.arg: eval_node(a.value) for a in call_node.keywords}
+
+        default = from_args.get("default",kw.get("default", None))
+        dtype = from_args.get("datatype",kw.get("datatype", None))
+        desc = from_args.get("description",kw.get("description", None))
+        index = from_args.get("index",kw.get("index", None))
+
 
         if dtype is None and ann is not None:
             dtype = ast.unparse(ann)
