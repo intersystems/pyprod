@@ -14,6 +14,15 @@ datatype_map = {
 
 iris_reference = type(iris.ref())
 
+def snake_to_camel(s: str) -> str:
+    # Check if the string is in snake_case
+    if "_" in s and s.lower() == s:
+        parts = s.split("_")
+        # Capitalize each part except the first
+        return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+    # Return original if not snake_case
+    return s
+
 
 class IRISLog:
 
@@ -675,7 +684,7 @@ class ProductionMessage:
             # service from the productions UI. Here, the json_str_or_dict would be empty. 
             if json_str_or_dict == "":
                 for name in cls._column_field_names:
-                    if (val:=getattr(iris_message_object,name)) is not "":
+                    if (val:=getattr(iris_message_object,snake_to_camel(name))) is not "":
                         setattr(self, name, val)
             else:
                 if serializer != "pickle":
@@ -864,14 +873,16 @@ class JsonSerialize(ProductionMessage):
         object.__setattr__(self, "_serial_stream", "")
 
     def create_iris_message_object_properties(self, message_object):
-        module_name = message_object.__class__.__module__[5:]
-        class_name = message_object.__class__.__name__
-        saved_class_name = module_name + "." + class_name
-        cdef = iris._Dictionary.ClassDefinition._OpenId(saved_class_name)
-        for i in range(1, cdef.Properties.Count() + 1, 1):
-            prop = cdef.Properties.GetAt(i).Name
-            if prop in self.__dict__:
-                setattr(message_object, prop, self.__dict__[prop])
+        for prop in self._column_field_names:
+            setattr(message_object, snake_to_camel(prop), self.__dict__[prop])
+        # module_name = message_object.__class__.__module__[5:]
+        # class_name = message_object.__class__.__name__
+        # saved_class_name = module_name + "." + class_name
+        # cdef = iris._Dictionary.ClassDefinition._OpenId(saved_class_name)
+        # for i in range(1, cdef.Properties.Count() + 1, 1):
+        #     prop = cdef.Properties.GetAt(i).Name
+        #     if prop in self.__dict__:
+        #         setattr(message_object, prop, self.__dict__[prop])
 
 
 def unpickle_binary(iris_message_object,MsgCls):
@@ -978,12 +989,14 @@ class PickleSerialize(ProductionMessage):
         object.__setattr__(self, "_serial_stream", "")
 
     def create_iris_message_object_properties(self, message_object):
+        for prop in self._column_field_names:
+            setattr(message_object, snake_to_camel(prop), self.__dict__[prop])
         # saved_class_name = self._package+"."+self.__class__.__name__
-        module_name = message_object.__class__.__module__[5:]
-        class_name = message_object.__class__.__name__
-        saved_class_name = module_name + "." + class_name
-        cdef = iris._Dictionary.ClassDefinition._OpenId(saved_class_name)
-        for i in range(1, cdef.Properties.Count() + 1, 1):
-            prop = cdef.Properties.GetAt(i).Name
-            if prop in self.__dict__:
-                setattr(message_object, prop, self.__dict__[prop])
+        # module_name = message_object.__class__.__module__[5:]
+        # class_name = message_object.__class__.__name__
+        # saved_class_name = module_name + "." + class_name
+        # cdef = iris._Dictionary.ClassDefinition._OpenId(saved_class_name)
+        # for i in range(1, cdef.Properties.Count() + 1, 1):
+        #     prop = cdef.Properties.GetAt(i).Name
+        #     if prop in self.__dict__:
+        #         setattr(message_object, prop, self.__dict__[prop])

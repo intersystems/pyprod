@@ -30,6 +30,14 @@ DATATYPE_MAP = {"str": "%VarString", "int": "%Integer", "bool": "%Boolean"}
 DATATYPE_MAP_Parameters = {"str": "STRING", "int": "INTEGER", "bool": "BOOLEAN"}
 
 
+def snake_to_camel(s: str) -> str:
+    # Check if the string is in snake_case
+    if "_" in s and s.lower() == s:
+        parts = s.split("_")
+        # Capitalize each part except the first
+        return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+    # Return original if not snake_case
+    return s
 
 def extract_package_name(tree, default_name):
     for node in tree.body:
@@ -631,7 +639,7 @@ def props_and_indices_from_msg_class(node: ast.ClassDef):
         ):
             continue
 
-        prop_name = target_node.id
+        prop_name = snake_to_camel(target_node.id)
 
 
         from_args= {}
