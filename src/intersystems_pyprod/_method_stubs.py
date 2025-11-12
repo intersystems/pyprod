@@ -60,6 +60,8 @@ Method OnInit() As %Status
 
 Property PythonClassName As %String(MAXLEN = "") [ InitialExpression = "{ClassName}" ];
 
+Property PythonModuleOrScript As %String(MAXLEN = "") [ InitialExpression = "{ScriptName}" ];
+
 Method OnInit() As %Status
 {{
     s status = $$$OK
@@ -151,7 +153,7 @@ Method OnTearDown() As %Status
 Method OnRequest(request As %Library.Persistent, Output response As %Library.Persistent) As %Status
 {{
       try{{
-        set PyLib = ##class(%SYS.Python).Import("{ScriptName}")
+        set PyLib = ##class(%SYS.Python).Import(..PythonModuleOrScript)
         set PythonClassObject = $method(PyLib,..PythonClassName, $this)
         Set arr = PythonClassObject.OnRequestHelper(request)
         set status = arr."__getitem__"("status")
@@ -173,7 +175,7 @@ Method OnRequest(request As %Library.Persistent, Output response As %Library.Per
 Method OnResponse(request As %Library.Persistent, ByRef response As %Library.Persistent, callrequest As %Library.Persistent, callresponse As %Library.Persistent, pCompletionKey As %String) As %Status
 {{
     try{{
-          set PyLib = ##class(%SYS.Python).Import("{ScriptName}")
+          set PyLib = ##class(%SYS.Python).Import(..PythonModuleOrScript)
           set PythonClassObject = $method(PyLib,..PythonClassName, $this)
           set arr = PythonClassObject.OnResponseHelper(request,response,callrequest,callresponse,pCompletionKey)
           set status = arr."__getitem__"("status")
