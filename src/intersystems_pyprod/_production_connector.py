@@ -1,10 +1,11 @@
+import ast
 import importlib
 import inspect
-from typing import get_type_hints
-import iris
 import pickle
 import sys
-import ast
+from typing import get_type_hints
+
+import iris
 
 datatype_map = {
     "int": "%Integer",
@@ -71,7 +72,7 @@ class Status:
 
     @staticmethod
     def ERROR(error_string):
-        iris.system.Status.Error(5001, error_string)
+        return iris.system.Status.Error(5001, error_string)
 
 
 class IRISProperty:
