@@ -35,7 +35,7 @@ class MyPickleData(PickleSerialize):
 
 
 class CustomInAdapter(InboundAdapter):
-    Counter = IRISProperty("int", default=0)
+    Counter = IRISProperty(0,"int")
 
     def OnTask(self):
         status = Status.OK()
@@ -92,7 +92,7 @@ class CustomBO(BusinessOperation):
     ADAPTER = IRISParameter("QuickStart.CustomOutAdapter")
     MessageMap = {
         "QuickStart.MyPickleData": "BOmethod1",
-        "QuickStart.MyJsonData": "BOmethod2",
+        "QuickStart.MyJsonData": "BOmethod2"
     }
 
     def BOmethod1(self, request):
@@ -107,7 +107,7 @@ class CustomBO(BusinessOperation):
         IRISLog.Info("Data received at BOmethod2 is: " + request.Name)
         response = MyPickleData("response from BOmethod2", 0)
         return status, response
-
+  
 
 class CustomOutAdapter(OutboundAdapter):
     def OutAdapterMethod(self, information="default"):
