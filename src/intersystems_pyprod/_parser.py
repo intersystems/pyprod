@@ -1,10 +1,16 @@
 import ast
 import os
 import sys
+import types
 import argparse
 from pathlib import Path
-from ._method_stubs import STUBS
+from typing import Optional, Tuple
+from types import ModuleType
+import importlib
+import importlib.util
 from operator import attrgetter
+
+from ._method_stubs import STUBS
 
 TARGET_SUPERCLASSES = [
     "InboundAdapter",
@@ -22,6 +28,7 @@ MESSAGE_SUPERCLASSES = [ "JsonSerialize", "PickleSerialize"]
 DATATYPE_MAP = {"str": "%VarString", "int": "%Integer", "bool": "%Boolean"}
 
 DATATYPE_MAP_Parameters = {"str": "STRING", "int": "INTEGER", "bool": "BOOLEAN"}
+
 
 
 def extract_package_name(tree, default_name):
@@ -54,11 +61,62 @@ def real_filename(path):
     return p
 
 
+def find_package_root_and_qualname(file_path: Path, source_root: Optional[Path] = None) -> Tuple[Path, str]:
+    """
+    Return (package_root, qualified_module_name) for a filesystem path to a .py file.
+
+    If source_root is provided, the qualified name is computed relative to that root.
+    Otherwise, we auto-detect by walking up directories as long as __init__.py exists.
+    """
+    p = Path(file_path).resolve()
+
+    if source_root is not None:
+        root = Path(source_root).resolve()
+        rel = p.relative_to(root)
+        parts = list(rel.parts)
+        if parts[-1].endswith(".py"):
+            parts[-1] = parts[-1][:-3]
+        qualname = ".".join(parts)
+        return root, qualname
+
+    # Auto-detect root by climbing until no __init__.py
+    cur = p.parent
+    package_parts = []
+    while (cur / "__init__.py").exists():
+        package_parts.append(cur.name)
+        cur = cur.parent
+    package_parts.reverse()
+    qualname = ".".join(package_parts + [p.stem]) if package_parts else p.stem
+    return cur, qualname
+
+
+def import_module_from_path(file_path: Path, qualname: str, package_root: Path) -> ModuleType:
+    """
+    Import a module from a file under the desired qualified name, ensuring __package__
+    is correct so explicit relative imports (from .x import y) work.
+    """
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+
+    spec = importlib.util.spec_from_file_location(qualname, str(file_path))
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not create spec for {file_path} as {qualname}")
+
+    module = importlib.util.module_from_spec(spec)
+    # Ensure __package__ is the parent package (critical for relative imports!)
+    module.__package__ = qualname.rpartition(".")[0]
+    sys.modules[qualname] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+
 def load_to_iris(cls_string, cls_name):
     try:
         # required = ["IRISUSERNAME", "IRISPASSWORD", "IRISNAMESPACE", "IRISINSTALLDIR"]
         # ensure_env(required)
         # set_derived_env_vars()
+
         import iris
 
         print(f"Loading {cls_name} to IRIS...")
@@ -93,59 +151,55 @@ def get_class_module_ast(cls) -> ast.Module:
 
 # _______________________________________________________________________________________________________________________ get_class_module_ast #
 
-
-def detect_custom_classes(tree, script_path, script_name, output, manual):
-    import importlib.util
-    import sys
-    import os
-
-    script_dir = os.path.dirname(script_path)
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-
-    spec = importlib.util.spec_from_file_location(script_name, script_path)
-    my_module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = my_module
-    spec.loader.exec_module(my_module)
-
+def detect_custom_classes(tree, loaded_module: ModuleType, output, manual, real_path: Path,args_module):
+    """
+    Walk the AST and detect classes whose runtime superclasses are custom classes
+    (determined through attributes on the runtime class). 
+    """
     result = []
     superclasspathlist = set()
+    superclassmodule = {}
+
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
             for base in node.bases:
                 name = getattr(base, "id", getattr(base, "attr", None))
                 if name in TARGET_SUPERCLASSES:
-                    pass  # This case has already been handled
-                else:
-                    clsobj = getattr(my_module, node.name, None)
-                    if clsobj is not None:
-                        if (hostname := getattr(clsobj, "_hostname", None)) is not None:
-                            if hostname in TARGET_SUPERCLASSES:
-                                superclass = attrgetter(ast.unparse(base))(my_module)
-                                superclassname = superclass._fullname
-                                superclasspath = get_class_module_ast(superclass)
-                                if superclasspath not in _visited_paths:
-                                    superclasspathlist.add(superclasspath)
+                    # handled by generate_os_classes
+                    continue
+                clsobj = getattr(loaded_module, node.name, None)
+                if clsobj is not None:
+                    hostname = getattr(clsobj, "_hostname", None)
+                    if hostname in TARGET_SUPERCLASSES:
+                        superclass = attrgetter(ast.unparse(base))(loaded_module)
+                        superclassname = superclass._fullname
+                        superclasspath = get_class_module_ast(superclass)
+                        if superclasspath not in _visited_paths:
+                            superclasspathlist.add(superclasspath)
+                            superclassmodule[superclasspath] = str(superclass.__module__)
 
-                                result.append((node.name, superclassname, node, hostname))
+                        result.append((node.name, superclassname, node, hostname))
 
     for superclasspath in superclasspathlist:
         if superclasspath in _visited_paths:
             continue
-        next_argv = [str(superclasspath)]
+        next_argv = []
         if output:
             next_argv += ["-o", output]
         if manual:
+            next_argv += ["--manual"]
+        if args_module:
             next_argv += ["-m"]
+            next_argv += [superclassmodule[superclasspath]]
+        else:
+            next_argv += [str(superclasspath)]
         main(next_argv)
 
     return result
 
 
-def generate_custom_classes( tree, script_name, folder_name, package_name, output, script_path, manual, real_path):
-
-    python_library = f"{folder_name}.{script_name}"
-    classes = detect_custom_classes(tree, real_path, script_name, output, manual)
+def generate_custom_classes(tree, script_name, folder_name, package_name, output, script_path, manual, real_path, python_library, loaded_module: ModuleType,args_module):
+    classes = detect_custom_classes(tree, loaded_module, output, manual, real_path,args_module)
     if not classes:
         return
     class_tmpl = STUBS.get("ClassDefinition")
@@ -154,25 +208,13 @@ def generate_custom_classes( tree, script_name, folder_name, package_name, outpu
 
     all_classes = {}
     for cls_name, supercls, node, hostname in classes:
-        # Build OnInit method
-        props_lines, settings_list,message_map_methods = extract_props_and_settings(node, real_path)
+        props_lines, settings_list, message_map_methods = extract_props_and_settings(node, real_path)
         props_block = "\n".join(props_lines) if props_lines else ""
-
-        # params = []
-        params_settings = (
-            f'Parameter SETTINGS = "{",".join(settings_list)}";'
-            if settings_list else ""
-        )
-
+        params_settings = f'Parameter SETTINGS = "{",".join(settings_list)}";' if settings_list else ""
         param_lines = extract_params(node)
-
         param_lines.append(params_settings)
-
         params_block = "\n".join(param_lines) if param_lines else ""
 
-        # params.append(param_setting)
-
-        # code for getting all parameters
         if hostname == "BusinessProcess":
             oninit = bp_oninit.format(
                 ClassName=cls_name,
@@ -195,26 +237,19 @@ def generate_custom_classes( tree, script_name, folder_name, package_name, outpu
         methods = [oninit]
         super_stubs = STUBS.get(hostname, {})
 
-        # Inspect user-defined methods
         for child in node.body:
             if isinstance(child, ast.FunctionDef):
-
                 name = child.name
                 args_string = get_args(child)
-                # Determine stub: specific stub or AnyMethod for certain superclasses
                 if name in super_stubs:
                     stub_tmpl = super_stubs[name]
-                elif (hostname is "BusinessOperation" and name not in message_map_methods):
+                elif (hostname == "BusinessOperation" and name not in message_map_methods):
                     continue
-                elif (
-                    hostname in ("BusinessOperation", "OutboundAdapter")
-                    and "AnyMethod" in super_stubs
-                ):
+                elif (hostname in ("BusinessOperation", "OutboundAdapter") and "AnyMethod" in super_stubs):
                     stub_tmpl = super_stubs["AnyMethod"]
                 else:
                     continue
 
-                # Fill method stub, include MethodName for AnyMethod templates
                 content_stub = stub_tmpl.format(
                     ClassName=cls_name,
                     PackageName=package_name,
@@ -226,9 +261,9 @@ def generate_custom_classes( tree, script_name, folder_name, package_name, outpu
                     ScriptName=script_name,
                 )
                 methods.append(content_stub)
+
         methods_combined = "\n".join(methods)
 
-        # Fill the class template
         content = class_tmpl.format(
             ClassName=cls_name,
             PackageName=package_name,
@@ -254,7 +289,6 @@ def generate_custom_classes( tree, script_name, folder_name, package_name, outpu
     if not manual:
         for cls_name in all_classes.keys():
             load_to_iris(all_classes[cls_name], cls_name)
-
 
 # _______________________________________________________________________________________________________________________ generate_custom_classes #
 
@@ -475,9 +509,7 @@ def find_ossubclasses(tree):
     return result
 
 
-def generate_os_classes(tree, script_name, folder_name, package_name, output, script_path, manual, real_path):
-
-    python_library = f"{folder_name}.{script_name}"
+def generate_os_classes(tree, script_name, folder_name, package_name, output, script_path, manual, real_path, python_library):
     classes = find_ossubclasses(tree)
     class_tmpl = STUBS.get("ClassDefinition")
     common_oninit = STUBS.get("Common", {}).get("OnInit", "")
@@ -485,25 +517,13 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
 
     all_classes = {}
     for cls_name, supercls, node in classes:
-        # Build OnInit method
         props_lines, settings_list, message_map_methods = extract_props_and_settings(node, real_path)
         props_block = "\n".join(props_lines) if props_lines else ""
-
-        # params = []
-        params_settings = (
-            f'Parameter SETTINGS = "{",".join(settings_list)}";'
-            if settings_list else ""
-        )
-
+        params_settings = f'Parameter SETTINGS = "{",".join(settings_list)}";' if settings_list else ""
         param_lines = extract_params(node)
-
         param_lines.append(params_settings)
-
         params_block = "\n".join(param_lines) if param_lines else ""
 
-        # params.append(param_setting)
-
-        # code for getting all parameters
         if supercls == "BusinessProcess":
             oninit = bp_oninit.format(
                 ClassName=cls_name,
@@ -526,28 +546,19 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
         methods = [oninit]
         super_stubs = STUBS.get(supercls, {})
 
-        # Inspect user-defined methods
         for child in node.body:
             if isinstance(child, ast.FunctionDef):
-
                 name = child.name
                 args_string = get_args(child)
-                # Determine stub: specific stub or AnyMethod for certain superclasses
                 if name in super_stubs:
                     stub_tmpl = super_stubs[name]
-                elif (supercls is "BusinessOperation" and name not in message_map_methods):
+                elif (supercls == "BusinessOperation" and name not in message_map_methods):
                     continue
-                elif (
-                    supercls in ("BusinessOperation", "OutboundAdapter")
-                    and "AnyMethod" in super_stubs
-                ):
-
+                elif (supercls in ("BusinessOperation", "OutboundAdapter") and "AnyMethod" in super_stubs):
                     stub_tmpl = super_stubs["AnyMethod"]
                 else:
                     continue
 
-                # print(cls_name, supercls, name)
-                # Fill method stub, include MethodName for AnyMethod templates
                 content_stub = stub_tmpl.format(
                     ClassName=cls_name,
                     PackageName=package_name,
@@ -559,9 +570,9 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
                     ScriptName=script_name,
                 )
                 methods.append(content_stub)
+
         methods_combined = "\n".join(methods)
 
-        # Fill the class template
         content = class_tmpl.format(
             ClassName=cls_name,
             PackageName=package_name,
@@ -664,67 +675,57 @@ def props_and_indices_from_msg_class(node: ast.ClassDef):
 
     return props, indices
 
-
-def find_custom_message_classes(tree, script_path, script_name, output, manual):
-
-    import importlib.util
-    import sys
-    import os
-
+def find_custom_message_classes(tree, loaded_module: ModuleType, output, manual, real_path: Path,args_module):
     result = []
-
-    script_dir = os.path.dirname(script_path)
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-
-    spec = importlib.util.spec_from_file_location(script_name, script_path)
-    my_module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = my_module
-    spec.loader.exec_module(my_module)
-
     superclasspathlist = set()
+    superclassmodule = {}
+
     for node in ast.walk(tree):
         if not isinstance(node, ast.ClassDef):
             continue
 
-        # Check each base class for a match
         for base in node.bases:
             name = getattr(base, "id", None) or getattr(base, "attr", None)
             if name in MESSAGE_SUPERCLASSES:
-                pass # This case has already been handled in find_message_classes()
-            else:
-                clsobj = getattr(my_module, node.name, None)
-                if clsobj is not None:
-                    if (serializer := getattr(clsobj, "_serializer", None)) is not None:
-                        if serializer in MESSAGE_SUPERCLASSES:
-                            superclass = attrgetter(ast.unparse(base))(my_module)
-                            superclassname = superclass._fullname
+                # handled by find_message_classes / generate_msg_wrappers
+                continue
 
-                            superclasspath = get_class_module_ast(superclass)
-                            if superclasspath not in _visited_paths_msgs:
-                                superclasspathlist.add(superclasspath)
+            clsobj = getattr(loaded_module, node.name, None)
+            if clsobj is not None:
+                serializer = getattr(clsobj, "_serializer", None)
+                if serializer in MESSAGE_SUPERCLASSES:
+                    superclass = attrgetter(ast.unparse(base))(loaded_module)
+                    superclassname = superclass._fullname
+                    superclasspath = get_class_module_ast(superclass)
+                    if superclasspath not in _visited_paths_msgs:
+                        superclasspathlist.add(superclasspath)
+                        superclassmodule[superclasspath] = str(superclass.__module__)
+                    result.append((node.name, superclassname, node, serializer))
 
-                            result.append((node.name, superclassname, node, serializer))
     for superclasspath in superclasspathlist:
         if superclasspath in _visited_paths_msgs:
             continue
-        next_argv = [str(superclasspath)]
+        next_argv = []
         if output:
             next_argv += ["-o", output]
         if manual:
+            next_argv += ["--manual"]
+        if args_module:
             next_argv += ["-m"]
+            next_argv += [superclassmodule[superclasspath]]
+        else:
+            next_argv += [str(superclasspath)]
         main(next_argv)
 
     return result
 
-
-def generate_custom_msg_wrappers(tree, script_name, folder_name, package_name, python_library, output, script_path, manual,real_path):
-    classes = find_custom_message_classes(tree,real_path, script_name, output, manual)
+def generate_custom_msg_wrappers(tree, script_name, folder_name, package_name, python_library, output, script_path, manual, real_path, loaded_module: ModuleType,args_module):
+    classes = find_custom_message_classes(tree, loaded_module, output, manual, real_path,args_module)
     if not classes:
         return
+
     all_classes = {}
     for cls, superclass_name, node, serializer in classes:
-
         props_lines, indices = props_and_indices_from_msg_class(node)
         props_block = "\n".join(props_lines) if props_lines else ""
         indices_block = "\n".join(indices) if indices else ""
@@ -757,7 +758,6 @@ def generate_custom_msg_wrappers(tree, script_name, folder_name, package_name, p
 
         all_classes[cls] = content
 
-    ## loading to IRIS. This might fail if env variables are not set correctly
     if not manual:
         for cls_name in all_classes.keys():
             load_to_iris(all_classes[cls_name], cls_name)
@@ -831,63 +831,130 @@ def generate_msg_wrappers(tree, script_name, folder_name, package_name, python_l
 # _______________________________________________________________________________________________________________________ generate_msg_wrappers #
 
 
+
+def get_package_root(module_name: str) -> Path:
+    spec = importlib.util.find_spec(module_name)
+    if not spec or not spec.origin or not spec.origin.endswith((".py", ".pyc")):
+        raise ImportError(f"{module_name!r} does not resolve to a normal .py module (spec={spec})")
+
+    base = Path(spec.origin).resolve().parent  # directory containing the .py file
+    parts = module_name.split(".")
+    project_root = base.parents[len(parts) - 2] if len(parts) > 1 else base
+    return project_root
+
 _visited_paths: set[Path] = set()
 _visited_paths_msgs: set[Path] = set()
 
 
 def main(argv: list[str] = None):
-
     parser = argparse.ArgumentParser(description="Generate ObjectScript classes")
-    parser.add_argument("input_script", help="Path to user script")
     parser.add_argument("-o", "--output", required=False, help="Output folder")
-    parser.add_argument("-m", "--manual", action="store_true", help="Run in manual mode")
+    parser.add_argument("--manual", action="store_true", help="Run in manual mode")
+    parser.add_argument("-m", "--module", help="Dotted module to analyze (e.g. pkg.sub.mod). If set, ignore positional file.")
+    parser.add_argument("-s", "--source-root", help="Project source root used to compute absolute module names when loading from a file", dest="sourceroot")
+    parser.add_argument("input_script", nargs="?", help="Path to a .py file (used when -m/--module is not provided)")
     args = parser.parse_args(argv)
 
-    try:
-        with open(args.input_script, "r") as f:
-            real_path = real_filename(f.name).resolve()
-            source = f.read()
-    except Exception as e:
-        print(f"Error reading input script: {e}")
-        sys.exit(1)
-    tree = ast.parse(source)
+    # Load source and module under a correct package context
+    if args.sourceroot:
+        sys.path.insert(0, os.path.abspath(args.sourceroot))
+    else:
+        # even though python automatically adds cwd to sys.path, running this cli tool DOES NOT.
+        # So we need to manually add it. However, while recursively parsing imports, this gets fixed at
+        # the iris namespace path (import iris does that)
+        sys.path.insert(0, os.getcwd())
 
-    script_name = real_path.stem
-    script_path = real_path.parent
-    folder_name = (
-        os.path.basename(os.path.dirname(os.path.abspath(args.input_script)))
-        or script_name
-    )
-    package_name = extract_package_name(tree, script_name)
+    if args.module:
+        # Metadata for stubs
+        module_name = args.module
+        script_name = module_name
+        script_path = get_package_root(module_name)
+        # Module mode
+        try:
+            loaded_module = importlib.import_module(module_name)
+        except Exception as e:
+            print(f"Error importing module {module_name}: {e}")
+            sys.exit(1)
+        real_path = Path(loaded_module.__file__).resolve()
+        try:
+            source = real_path.read_text(encoding="utf-8")
+        except Exception as e:
+            print(f"Error reading source of module {module_name} at {real_path}: {e}")
+            sys.exit(1)
+
+    else:
+        # File mode
+        if not args.input_script:
+            print("You must provide either -m/--module or a path to a .py file.")
+            sys.exit(2)
+        try:
+            with open(args.input_script, "r", encoding="utf-8") as f:
+                real_path = real_filename(f.name).resolve()
+                source = f.read()
+        except Exception as e:
+            print(f"Error reading input script: {e}")
+            sys.exit(1)
+
+        # Compute package root + qualified name; import with that name
+        package_root, module_name = find_package_root_and_qualname(real_path, Path(args.sourceroot).resolve() if args.sourceroot else None)
+        try:
+            loaded_module = import_module_from_path(real_path, module_name, package_root)
+        except Exception as e:
+            print(f"Error importing {real_path} as {module_name}: {e}")
+            sys.exit(1)
+
+        # Metadata for stubs
+        script_name = real_path.stem
+        script_path = real_path.parent
+
+    # Parse AST
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as e:
+        print(f"Syntax error while parsing {real_path}: {e}")
+        sys.exit(1)
+
+
+    # Keep existing behaviour: if not inside package, fallback to script dir name or script name
+    folder_name = os.path.basename(os.path.dirname(os.path.abspath(real_path))) or real_path.stem
+    package_name = extract_package_name(tree, real_path.stem)
+    python_library = module_name  # fully qualified module path
+
     if args.output:
         os.makedirs(args.output, exist_ok=True)
 
+    # Track visited paths
     _visited_paths.add(real_path)
     _visited_paths_msgs.add(real_path)
 
+    # Message wrappers (built-ins)
     generate_msg_wrappers(
         tree,
         script_name,
         folder_name,
         package_name,
-        f"{folder_name}.{script_name}",
+        python_library,
         args.output,
         script_path,
         args.manual,
     )
 
+    # Message wrappers (custom)
     generate_custom_msg_wrappers(
         tree,
         script_name,
         folder_name,
         package_name,
-        f"{folder_name}.{script_name}",
+        python_library,
         args.output,
         script_path,
         args.manual,
         real_path,
+        loaded_module,
+        args.module
     )
 
+    # Ens.* subclasses
     generate_os_classes(
         tree,
         script_name,
@@ -897,8 +964,10 @@ def main(argv: list[str] = None):
         script_path,
         args.manual,
         real_path,
+        python_library,
     )
 
+    # Custom subclasses of your runtime types
     generate_custom_classes(
         tree,
         script_name,
@@ -908,7 +977,11 @@ def main(argv: list[str] = None):
         script_path,
         args.manual,
         real_path,
+        python_library,
+        loaded_module,
+        args.module
     )
+
 
 
 if __name__ == "__main__":
