@@ -653,19 +653,10 @@ class ProductionMessage:
         # generating objects dynamically at runtime based on incoming message type...
         _ProductionMessage_registry[cls._fullname] = cls
 
-    def __init__(
-        self,
-        *args,
-        iris_message_object=None,
-        json_str_or_dict=None,
-        serializer="json",
-        **kwargs,
-    ):
+    def __init__(self,*args,iris_message_object=None,json_str_or_dict=None,serializer="json",**kwargs,):
 
         if (json_str_or_dict is None) != (iris_message_object is None):
-            raise TypeError(
-                "iris_message_object or json_str_or_dict both need to be provided."
-            )
+            raise TypeError("iris_message_object or json_str_or_dict both need to be provided.")
 
         if (args or kwargs) and (iris_message_object or json_str_or_dict):
             raise TypeError(
@@ -810,18 +801,11 @@ class JsonSerialize(ProductionMessage):
         super().__init_subclass__(**kwargs)
         cls._serializer = "JsonSerialize"
     
-    def __init__(
-        self,
-        *args,
-        iris_message_object=None,
-        json_str_or_dict=None,
-        serializer="json",
-        **kwargs,
-    ):
+    def __init__(self,*args,iris_message_object=None,json_str_or_dict=None,serializer="json",**kwargs,):
         if (iris_message_object is not None) and (json_str_or_dict is None):
-            chunkSize = (
-                3 * 1024 * 1024
-            )  # note. keep in mind that increasing it to a higher value can lead to <MAXSTRING> error in IRIS
+            chunkSize = ( 3 * 1024 * 1024)  
+            # note. keep in mind that increasing it to a higher value can lead to <MAXSTRING> error in IRIS
+
             iteration = 0
             chunks = []
             while True:
@@ -833,7 +817,7 @@ class JsonSerialize(ProductionMessage):
             json_str = "".join(chunks)
 
             json_str_or_dict = json_str
-        return super().__init__(
+        super().__init__(
             *args,
             iris_message_object=iris_message_object,
             json_str_or_dict=json_str_or_dict,
@@ -875,14 +859,6 @@ class JsonSerialize(ProductionMessage):
     def create_iris_message_object_properties(self, message_object):
         for prop in self._column_field_names:
             setattr(message_object, snake_to_camel(prop), self.__dict__[prop])
-        # module_name = message_object.__class__.__module__[5:]
-        # class_name = message_object.__class__.__name__
-        # saved_class_name = module_name + "." + class_name
-        # cdef = iris._Dictionary.ClassDefinition._OpenId(saved_class_name)
-        # for i in range(1, cdef.Properties.Count() + 1, 1):
-        #     prop = cdef.Properties.GetAt(i).Name
-        #     if prop in self.__dict__:
-        #         setattr(message_object, prop, self.__dict__[prop])
 
 
 def unpickle_binary(iris_message_object,MsgCls):
@@ -913,7 +889,6 @@ def unpickle_binary(iris_message_object,MsgCls):
     return thisobject
 
 
-
 class PickleSerialize(ProductionMessage):
     __slots__ = ("_serial_stream",)
 
@@ -924,29 +899,7 @@ class PickleSerialize(ProductionMessage):
     def __init__(self, *args, iris_message_object=None, **kwargs):
         ## initialize _serial_stream to empty string as it is only temporarily holding a value, before and after that it must stay empty
         object.__setattr__(self, "_serial_stream", "")
-        if iris_message_object is not None:
-            import pickle
-
-            chunkSize = (
-                3 * 1024 * 1024
-            )  # note. keep in mind that increasing it to a higher value can lead to <MAXSTRING> error in IRIS
-            iteration = 0
-            chunks = []
-            while True:
-                part = iris_message_object.chunksFromIRIS(iteration, chunkSize)
-                if not part:
-                    break
-                chunks.append(part)
-                iteration += 1
-
-            binary_serial_msg = b"".join(chunks)
-
-            thisobject = pickle.loads(binary_serial_msg)
-            thisobject._iris_message_wrapper = iris_message_object
-            return thisobject
-            # object.__setattr__(self, "_iris_message_wrapper", iris_message_object)
-        else:
-            return super().__init__(
+        super().__init__(
                 *args,
                 iris_message_object=iris_message_object,
                 json_str_or_dict=None,
@@ -991,12 +944,3 @@ class PickleSerialize(ProductionMessage):
     def create_iris_message_object_properties(self, message_object):
         for prop in self._column_field_names:
             setattr(message_object, snake_to_camel(prop), self.__dict__[prop])
-        # saved_class_name = self._package+"."+self.__class__.__name__
-        # module_name = message_object.__class__.__module__[5:]
-        # class_name = message_object.__class__.__name__
-        # saved_class_name = module_name + "." + class_name
-        # cdef = iris._Dictionary.ClassDefinition._OpenId(saved_class_name)
-        # for i in range(1, cdef.Properties.Count() + 1, 1):
-        #     prop = cdef.Properties.GetAt(i).Name
-        #     if prop in self.__dict__:
-        #         setattr(message_object, prop, self.__dict__[prop])
