@@ -1,0 +1,7 @@
+[Actions]
+CreateDatabase:Name=TEMP_DATA,Directory=/usr/irissys/mgr/TEMP_DATA,Resource=%DB_%DEFAULT
+CreateNamespace:Name=ENSEMBLE,Globals=TEMP_DATA,Routines=TEMP_DATA,Interop=1
+ModifyService:Name=%Service_CallIn,Enabled=1
+
+[Startup]
+PasswordHash=e5671d7f50ef7ae9881fbe4d1cf47692fb314ff4aeb8806f2bd347b54fb4693e67eaa369052209721ee8b2b459e1d9d4acbb00298007d95dafd27fa84585e123,a1c0896e82ef9483836b01e735d76c67886948e9a94a66990f6f26eee0f2bcb56b8797305ee729b6a37e9ae78076cc8a5b0b3cdd8f24ea3ca543ab02db94361a,10000,SHA512
