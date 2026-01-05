@@ -1,0 +1,82 @@
+name: pyprod CI (tests)
+
+on:
+  push:
+    paths-ignore: [ '**/*.md', 'docs/**', 'README*', 'CHANGELOG*', 'LICENSE*', '.github/ISSUE_TEMPLATE/**' ]
+  pull_request:
+    paths-ignore: [ '**/*.md', 'docs/**', 'README*', 'CHANGELOG*', 'LICENSE*', '.github/ISSUE_TEMPLATE/**' ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tests (${{ matrix.iris_image }} | py${{ matrix.py }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        iris_image: [ "intersystems/iris-community:2025.2", "intersystems/iris-community:2025.1", "intersystems/iris-community:2024.3" ]
+        py: [ "3.9", "3.10", "3.11", "3.12" ]
+
+    container:
+      image: ${{ matrix.iris_image }}
+      options: --user 0:0
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py }} 
+
+      - name: Start IRIS and wait
+        shell: bash
+        env:
+          ISC_CPF_MERGE_FILE: ${{ github.workspace }}/tests/config/merge.cpf
+        run: |
+          set -euo pipefail
+          chown -R irisowner:irisowner "$GITHUB_WORKSPACE" || true
+          runuser -u irisowner -- env ISC_CPF_MERGE_FILE="${ISC_CPF_MERGE_FILE}" /usr/irissys/bin/iris start IRIS
+          for i in {1..5}; do echo "Waiting for IRIS..."; sleep 1; done
+
+      - name: Build and Test
+        shell: bash
+        run: |
+          set -x
+          mkdir -p artifacts
+          export IRISINSTALLDIR="/usr/irissys"
+          export LD_LIBRARY_PATH=$IRISINSTALLDIR/bin:$IRISINSTALLDIR/dev:${LD_LIBRARY_PATH:-}
+          export IRISUSERNAME="superuser"
+          export IRISPASSWORD="SYS"
+          export IRISNAMESPACE=ENSEMBLE
+          export COMLIB="/usr/irissys/bin"
+          export PYTHONPATH="/usr/irissys/lib/python"
+          python -m venv .venv && source .venv/bin/activate
+
+          #build
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir dist .
+
+          #test
+          pip install -U pip pytest
+          pip install "$GITHUB_WORKSPACE/dist/intersystems_pyprod-1.0.0b1-py3-none-any.whl"
+          pip install "$GITHUB_WORKSPACE/dist/intersystems_pyprod-1.0.0b1-py3-none-any.whl" --target "/usr/irissys/mgr/python"
+          intersystems_pyprod "$GITHUB_WORKSPACE/tests/helpers/allPyComponents/AllPyComponents.py"
+          intersystems_pyprod "$GITHUB_WORKSPACE/tests/helpers/OsPyMixed/TCPAdaptersFromOs/TCPAdaptersFromOs.py"
+          pytest -vv --maxfail=5 --tb=long tests | tee artifacts/tests.log
+
+      - name: Make safe artifact name
+        if: always()
+        shell: bash
+        run: |
+          safe="${{ matrix.iris_image }}"
+          safe="${safe//\//-}"   # replace / with -
+          safe="${safe//:/-}"    # replace : with -
+          echo "SAFE_IMAGE=$safe" >> "$GITHUB_ENV"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyprod-build-test-logs-${{ matrix.py }}-${{ env.SAFE_IMAGE }}
+          path: artifacts/
