@@ -2,7 +2,7 @@
 name = "intersystems_pyprod"
 version = "1.0.0b1"
 authors = [
-  { name="Geet Kalra", email="geetkalra@intersystems.com" },
+  { name="Geet Kalra", email="geet.kalra@intersystems.com" },
 ]
 
 
