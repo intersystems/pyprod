@@ -42,7 +42,7 @@ class CustomInAdapter(InboundAdapter):
         try:
             time.sleep(0.5)
             msg = TempData("test", self.Counter)
-            status = self.BusinessHost_ProcessInput(msg)
+            status = self.business_host_process_input(msg)
             self.Counter += 1
         except Exception as e:
             error_msg = "ERROR in CustomInAdapter OnTask : "+str(e)

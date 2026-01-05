@@ -24,5 +24,5 @@ class TCPBusinessOperation(BusinessOperation):
     def sendout(self,input):
         status = Status.OK()
         IRISLog.Info("recevied at operation: "+str(input.value))
-        self.iris_host_object.Adapter.SendMessageString(input.value)
+        self.ADAPTER.SendMessageString(input.value)
         return status
