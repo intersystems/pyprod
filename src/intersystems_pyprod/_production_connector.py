@@ -12,6 +12,9 @@ datatype_map = {
     "str": "%VarString",
 }
 
+# increasing this to a higher value can lead to <MAXSTRING> error in IRIS
+BELOW_MAX_STRING = 3 * 1024 * 1024
+
 iris_reference = type(iris.ref())
 
 def snake_to_pascal(name: str) -> str:
@@ -119,28 +122,6 @@ class IRISProperty:
     def __set__(self, instance, value):
         setattr(instance.iris_host_object, snake_to_pascal(self.name), value)
 
-    def metadata(self):
-        return {
-            "datatype": self.datatype,
-            "description": self.description,
-            "default": self.default,
-            "SETTINGS": self.settings,
-        }
-
-    def generate_os_property(self):
-        desc = ""
-        if self.description:
-            desc = f"/// {self.description} \n"
-        desc = desc + f"Property {snake_to_pascal(self.name)}"
-        if self.datatype:
-            desc = desc + f" As {datatype_map[self.datatype]}"
-        else:
-            desc = desc + f" As %String"
-
-        if self.default:
-
-            desc = desc + " [InitialExpression = {self.default}] ;"
-        return desc
 
 
 class IRISParameter:
@@ -189,14 +170,6 @@ class IRISParameter:
     def __set__(self, instance, value):
         raise AttributeError(f"{self.name} is a class constant and cannot be modified")
 
-    def metadata(self):
-        return {
-            "value": self.value,
-            "description": self.description,
-            "datatype": self.datatype,
-            "keyword_list": self.keyword_list,
-        }
-
 
 
 class AdapterNamesToPascal:
@@ -207,7 +180,7 @@ class AdapterNamesToPascal:
       2) forward the operation to the outbound adapter object
 
     If the forwarded attribute is callable, the wrapper will call it with a SINGLE
-    argument: a string constructed from the caller's *args/**kwargs using repr().
+    argument: (args, kwargs).
     """
     def __init__(self, adapter_object):
         # Avoid recursion by writing directly to __dict__
@@ -384,31 +357,31 @@ class BusinessService(BaseClass):
             status = result
             return {"status": status, "pOutput_available": 0}
 
-    def SendRequestSync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
-        pResponse = iris.ref()
-        pSendSyncHandling = iris.ref()
+    def SendRequestSync(self, target_dispatch_name, request, timeout=-1, description=""):
+        response = iris.ref()
+        send_sync_handling = iris.ref()
         status = self.iris_host_object.SendRequestSync(
-            pTargetDispatchName,
-            self.request_to_send(pRequest),
-            pResponse,
-            pTimeout,
-            pDescription,
-            pSendSyncHandling,
+            target_dispatch_name,
+            self.request_to_send(request),
+            response,
+            timeout,
+            description,
+            send_sync_handling,
         )
 
-        response_value = pResponse.value
-        pResponse.value = None
-        sendSyncHandling_value = pSendSyncHandling.value
-        pSendSyncHandling.value = None
-        del pResponse
-        del pSendSyncHandling
+        response_value = response.value
+        response.value = None
+        send_sync_handling_value = send_sync_handling.value
+        send_sync_handling.value = None
+        del response
+        del send_sync_handling
 
-        if sendSyncHandling_value != None:
+        if send_sync_handling_value != None:
             if response_value != None:
                 return (
                     status,
                     self._createmessage(message_object=response_value),
-                    sendSyncHandling_value,
+                    send_sync_handling_value,
                 )
         else:
             if response_value != None:
@@ -418,15 +391,15 @@ class BusinessService(BaseClass):
 
         return status
     
-    def send_request_sync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
-        return self.SendRequestSync(pTargetDispatchName, pRequest, pTimeout, pDescription)
+    def send_request_sync(self, target_dispatch_name, request, timeout=-1, description=""):
+        return self.SendRequestSync(target_dispatch_name, request, timeout, description)
 
-    def SendRequestAsync(self, pTargetDispatchName, pRequest, pDescription=""):
-        status = self.iris_host_object.SendRequestAsync(pTargetDispatchName, self.request_to_send(pRequest), pDescription)
+    def SendRequestAsync(self, target_dispatch_name, request, description=""):
+        status = self.iris_host_object.SendRequestAsync(target_dispatch_name, self.request_to_send(request), description)
         return status
     
-    def send_request_async(self, pTargetDispatchName, pRequest, pDescription=""):
-        return self.SendRequestAsync(pTargetDispatchName, pRequest, pDescription)
+    def send_request_async(self, target_dispatch_name, request, description=""):
+        return self.SendRequestAsync(target_dispatch_name, request, description)
 
 
 class BusinessProcess(BaseClass):
@@ -456,18 +429,18 @@ class BusinessProcess(BaseClass):
             status = result
             return {"status": status, "response_available": 0}
 
-    def OnResponseHelper(self, request, response, callrequest, callresponse, pCompletionKey):
+    def OnResponseHelper(self, request, response, call_request, call_response, completion_key):
 
         python_request = self._createmessage(message_object=request)
         python_response = self._createmessage(message_object=response)
-        python_callrequest = self._createmessage(message_object=callrequest)
-        python_callresponse = self._createmessage(message_object=callresponse)
+        python_call_request = self._createmessage(message_object=call_request)
+        python_call_response = self._createmessage(message_object=call_response)
 
 
         if hasattr(self, "OnResponse"):
-            result = self.OnResponse(python_request,python_response,python_callrequest,python_callresponse,pCompletionKey)
+            result = self.OnResponse(python_request,python_response,python_call_request,python_call_response,completion_key)
         elif hasattr(self, "on_response"):
-            result = self.on_response(python_request,python_response,python_callrequest,python_callresponse,pCompletionKey)
+            result = self.on_response(python_request,python_response,python_call_request,python_call_response,completion_key)
         else:
             raise NotImplementedError("Subclass must implement OnResponse or on_response")
 
@@ -482,28 +455,28 @@ class BusinessProcess(BaseClass):
             status = result
             return {"status": status, "response_available": 0}
 
-    def SendRequestAsync(self,pTargetDispatchName,pRequest,pResponseRequired=1,pCompletionKey=0,pDescription=""):
-        status = self.iris_host_object.SendRequestAsync(pTargetDispatchName,self.request_to_send(pRequest),pResponseRequired,pCompletionKey,pDescription)
+    def SendRequestAsync(self,target_dispatch_name,request,response_required=1,completion_key=0,description=""):
+        status = self.iris_host_object.SendRequestAsync(target_dispatch_name,self.request_to_send(request),response_required,completion_key,description)
         return status
     
-    def send_request_async(self,pTargetDispatchName,pRequest,pResponseRequired=1,pCompletionKey=0,pDescription=""):
-        return self.SendRequestAsync(pTargetDispatchName,pRequest,pResponseRequired,pCompletionKey,pDescription)
+    def send_request_async(self,target_dispatch_name,request,response_required=1,completion_key=0,description=""):
+        return self.SendRequestAsync(target_dispatch_name,request,response_required,completion_key,description)
 
-    def SendRequestSync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
-        pResponse = iris.ref()
-        status = self.iris_host_object.SendRequestSync(pTargetDispatchName,self.request_to_send(pRequest),pResponse,pTimeout,pDescription)
+    def SendRequestSync(self, target_dispatch_name, request, timeout=-1, description=""):
+        response = iris.ref()
+        status = self.iris_host_object.SendRequestSync(target_dispatch_name,self.request_to_send(request),response,timeout,description)
 
-        response_value = pResponse.value
-        pResponse.value = None
-        del pResponse
+        response_value = response.value
+        response.value = None
+        del response
 
         if response_value != None:
             return status, self._createmessage(message_object=response_value)
         else:
             return status
         
-    def send_request_sync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
-        return self.SendRequestSync( pTargetDispatchName, pRequest, pTimeout, pDescription)
+    def send_request_sync(self, target_dispatch_name, request, timeout=-1, description=""):
+        return self.SendRequestSync( target_dispatch_name, request, timeout, description)
 
 
 class BusinessOperation(BaseClass):
@@ -536,9 +509,9 @@ class BusinessOperation(BaseClass):
             status = result
             return {"status": status, "response_available": 0}
 
-    def AnyMethodHelper(self, request, methodName):
+    def AnyMethodHelper(self, request, method_name):
         python_request = self._createmessage(message_object=request)
-        result = getattr(self, methodName)(python_request)
+        result = getattr(self, method_name)(python_request)
         if isinstance(result, (tuple, list)):
             status, response = result
             return {"response": self.request_to_send(response),"status": status,"response_available": 1}
@@ -546,34 +519,34 @@ class BusinessOperation(BaseClass):
             status = result
             return {"status": status, "response_available": 0}
 
-    def SendRequestSync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
-        pResponse = iris.ref()
+    def SendRequestSync(self, target_dispatch_name, request, timeout=-1, description=""):
+        response = iris.ref()
         status = self.iris_host_object.SendRequestSync(
-            pTargetDispatchName,
-            self.request_to_send(pRequest),
-            pResponse,
-            pTimeout,
-            pDescription,
+            target_dispatch_name,
+            self.request_to_send(request),
+            response,
+            timeout,
+            description,
         )
 
-        response_value = pResponse.value
-        pResponse.value = None
-        del pResponse
+        response_value = response.value
+        response.value = None
+        del response
 
         if response_value != None:
             return status, self._createmessage(message_object=response_value)
         else:
             return status
         
-    def send_request_sync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
-        return self.SendRequestSync(pTargetDispatchName, pRequest, pTimeout, pDescription)
+    def send_request_sync(self, target_dispatch_name, request, timeout=-1, description=""):
+        return self.SendRequestSync(target_dispatch_name, request, timeout, description)
 
-    def SendRequestAsync(self, pTargetDispatchName, pRequest, pDescription=""):
-        status = self.iris_host_object.SendRequestAsync(pTargetDispatchName, self.request_to_send(pRequest), pDescription)
+    def SendRequestAsync(self, target_dispatch_name, request, description=""):
+        status = self.iris_host_object.SendRequestAsync(target_dispatch_name, self.request_to_send(request), description)
         return status
     
-    def send_request_async(self, pTargetDispatchName, pRequest, pDescription=""):
-        return self.SendRequestAsync(pTargetDispatchName, pRequest, pDescription)
+    def send_request_async(self, target_dispatch_name, request, description=""):
+        return self.SendRequestAsync(target_dispatch_name, request, description)
 
 
 class InboundAdapter(BaseClass):
@@ -591,24 +564,24 @@ class InboundAdapter(BaseClass):
         else:
             raise NotImplementedError("Subclass must implement OnTask or on_task")
     
-    def BusinessHost_ProcessInput(self, pInput, InHint=""):
+    def BusinessHost_ProcessInput(self, input, in_hint=""):
         
-        pOutput = iris.ref()
-        pOutput.value = ""
-        tempHint = InHint
-        pHint = iris.ref()
-        pHint.value = tempHint
-        status = self.iris_host_object.BusinessHost.ProcessInput(pInput, pOutput, pHint)
+        output = iris.ref()
+        output.value = ""
+        temp_hint = in_hint
+        hint = iris.ref()
+        hint.value = temp_hint
+        status = self.iris_host_object.BusinessHost.ProcessInput(input, output, hint)
 
-        output_value = pOutput.value
-        pOutput.value = None
-        del pOutput
+        output_value = output.value
+        output.value = None
+        del output
 
-        hint_value = pHint.value
-        pHint.value = None
-        del pHint
+        hint_value = hint.value
+        hint.value = None
+        del hint
 
-        if InHint != "":
+        if in_hint != "":
             if (output_value is not None) and (output_value != ""):
                 return status, output_value, hint_value
         else:
@@ -617,19 +590,19 @@ class InboundAdapter(BaseClass):
             else:
                 return status
 
-    def business_host_process_input(self, pInput, InHint=""):
-        return self.BusinessHost_ProcessInput(pInput, InHint)
+    def business_host_process_input(self, input, in_hint=""):
+        return self.BusinessHost_ProcessInput(input, in_hint)
     
 class OutboundAdapter(BaseClass):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         cls._hostname = "OutboundAdapter"
 
-    def AnyMethodHelper(self, arguments, methodName):
+    def AnyMethodHelper(self, arguments, method_name):
 
         args, kwargs = arguments
         
-        result = getattr(self, methodName)(*args, **kwargs)
+        result = getattr(self, method_name)(*args, **kwargs)
 
         if isinstance(result, (tuple, list)):
             status = result[0]
@@ -759,10 +732,10 @@ class ProductionMessage:
                             setattr(self, name, val)
         else:
 
-            PackageName = cls._package
-            ClassName = cls.__name__
-            current_package = getattr(iris, PackageName)
-            current_class = getattr(current_package, ClassName)
+            package_name = cls._package
+            class_name = cls.__name__
+            current_package = getattr(iris, package_name)
+            current_class = getattr(current_package, class_name)
             iris_message_object = current_class._New()
 
             # building using args/kwargs. This is primarily to be used by python side.
@@ -865,13 +838,12 @@ class JsonSerialize(ProductionMessage):
     
     def __init__(self,*args,iris_message_object=None,json_str_or_dict=None,serializer="json",**kwargs,):
         if (iris_message_object is not None) and (json_str_or_dict is None):
-            chunkSize = ( 3 * 1024 * 1024)  
-            # note. keep in mind that increasing it to a higher value can lead to <MAXSTRING> error in IRIS
+            chunk_size = BELOW_MAX_STRING
 
             iteration = 0
             chunks = []
             while True:
-                part = iris_message_object.chunksFromIRIS(iteration, chunkSize)
+                part = iris_message_object.chunksFromIRIS(iteration, chunk_size)
                 if not part:
                     break
                 chunks.append(part)
@@ -887,7 +859,7 @@ class JsonSerialize(ProductionMessage):
             **kwargs,
         )
 
-    def chunksFromPython(self, iteration, start, end):
+    def chunks_from_python(self, iteration, start, end):
         if iteration == 0:
             import json
 
@@ -903,17 +875,17 @@ class JsonSerialize(ProductionMessage):
         return object.__getattribute__(self, "_iris_message_wrapper")
 
     def update_iris_message_object(self):
-        newStream = iris._Stream.GlobalCharacter._New()
-        chunkSize = 1024 * 3 * 1024
+        new_stream = iris._Stream.GlobalCharacter._New()
+        chunk_size = BELOW_MAX_STRING
         start = 0
         iteration = 0
-        chunk = self.chunksFromPython(iteration, start, start + chunkSize)
+        chunk = self.chunks_from_python(iteration, start, start + chunk_size)
         while chunk:
-            newStream.Write(chunk)
+            new_stream.Write(chunk)
             iteration = iteration + 1
-            start = start + chunkSize
-            chunk = self.chunksFromPython(iteration, start, start + chunkSize)
-        self._iris_message_wrapper.SerializedStream = newStream
+            start = start + chunk_size
+            chunk = self.chunks_from_python(iteration, start, start + chunk_size)
+        self._iris_message_wrapper.SerializedStream = new_stream
         self.create_iris_message_object_properties(self._iris_message_wrapper)
         ## reset _Serial_stream to empty string as it has no purpose
         object.__setattr__(self, "_serial_stream", "")
@@ -924,31 +896,29 @@ class JsonSerialize(ProductionMessage):
 
 
 def unpickle_binary(iris_message_object,MsgCls):
-    if iris_message_object is not None:
 
-        chunkSize = (
-            3 * 1024 * 1024
-        )  # note. keep in mind that increasing it to a higher value can lead to <MAXSTRING> error in IRIS
-        iteration = 0
-        chunks = []
-        while True:
-            part = iris_message_object.chunksFromIRIS(iteration, chunkSize)
-            if not part:
-                break
-            chunks.append(part)
-            iteration += 1
+    chunk_size = BELOW_MAX_STRING
+    iteration = 0
+    chunks = []
+    while True:
+        part = iris_message_object.chunksFromIRIS(iteration, chunk_size)
+        if not part:
+            break
+        chunks.append(part)
+        iteration += 1
 
-        binary_serial_msg = b"".join(chunks)
+    binary_serial_msg = b"".join(chunks)
 
-        if binary_serial_msg:
-            thisobject = pickle.loads(binary_serial_msg)
-            thisobject._iris_message_wrapper = iris_message_object
-        else: 
-            thisobject = MsgCls()
-            for name in thisobject._column_field_names:
-                if (val:=getattr(iris_message_object,name)) != "":
-                    setattr(thisobject, name, val)
-    return thisobject
+    if binary_serial_msg:
+        this_object = pickle.loads(binary_serial_msg)
+        this_object._iris_message_wrapper = iris_message_object
+    else: 
+        this_object = MsgCls()
+        for name in this_object._column_field_names:
+            if (val:=getattr(iris_message_object,snake_to_pascal(name))) != "":
+                setattr(this_object, name, val)
+
+    return this_object
 
 
 class PickleSerialize(ProductionMessage):
@@ -969,7 +939,7 @@ class PickleSerialize(ProductionMessage):
                 **kwargs,
             )
 
-    def chunksFromPython(self, iteration, start, end):
+    def chunks_from_python(self, iteration, start, end):
 
         if iteration == 0:
             import pickle
@@ -986,19 +956,19 @@ class PickleSerialize(ProductionMessage):
         return object.__getattribute__(self, "_serial_stream")[start:end]
 
     def update_iris_message_object(self):
-        newStream = iris._Stream.GlobalBinary._New()
-        chunkSize = 1024 * 3 * 1024
+        new_stream = iris._Stream.GlobalBinary._New()
+        chunk_size = BELOW_MAX_STRING
         start = 0
         iteration = 0
-        chunk = self.chunksFromPython(iteration, start, start + chunkSize)
-        bytepickledata = iris._SYS.Python.Bytes(chunk)
-        while bytepickledata:
-            newStream.Write(bytepickledata)
+        chunk = self.chunks_from_python(iteration, start, start + chunk_size)
+        pickle_data_bytes = iris._SYS.Python.Bytes(chunk)
+        while pickle_data_bytes:
+            new_stream.Write(pickle_data_bytes)
             iteration = iteration + 1
-            start = start + chunkSize
-            chunk = self.chunksFromPython(iteration, start, start + chunkSize)
-            bytepickledata = iris._SYS.Python.Bytes(chunk)
-        self._iris_message_wrapper.SerializedStream = newStream
+            start = start + chunk_size
+            chunk = self.chunks_from_python(iteration, start, start + chunk_size)
+            pickle_data_bytes = iris._SYS.Python.Bytes(chunk)
+        self._iris_message_wrapper.SerializedStream = new_stream
         self.create_iris_message_object_properties(self._iris_message_wrapper)
         ## reset _Serial_stream to empty string as it has no purpose
         object.__setattr__(self, "_serial_stream", "")

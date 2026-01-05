@@ -164,8 +164,8 @@ def detect_custom_classes(tree, loaded_module: ModuleType, output, manual, real_
     (determined through attributes on the runtime class). 
     """
     result = []
-    superclasspathlist = set()
-    superclassmodule = {}
+    superclass_path_list = set()
+    superclass_module = {}
 
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
@@ -179,16 +179,16 @@ def detect_custom_classes(tree, loaded_module: ModuleType, output, manual, real_
                     hostname = getattr(clsobj, "_hostname", None)
                     if hostname in TARGET_SUPERCLASSES:
                         superclass = attrgetter(ast.unparse(base))(loaded_module)
-                        superclassname = superclass._fullname
-                        superclasspath = get_class_module_ast(superclass)
-                        if superclasspath not in _visited_paths:
-                            superclasspathlist.add(superclasspath)
-                            superclassmodule[superclasspath] = str(superclass.__module__)
+                        superclass_name = superclass._fullname
+                        superclass_path = get_class_module_ast(superclass)
+                        if superclass_path not in _visited_paths:
+                            superclass_path_list.add(superclass_path)
+                            superclass_module[superclass_path] = str(superclass.__module__)
 
-                        result.append((node.name, superclassname, node, hostname))
+                        result.append((node.name, superclass_name, node, hostname))
 
-    for superclasspath in superclasspathlist:
-        if superclasspath in _visited_paths:
+    for superclass_path in superclass_path_list:
+        if superclass_path in _visited_paths:
             continue
         next_argv = []
         if output:
@@ -197,9 +197,9 @@ def detect_custom_classes(tree, loaded_module: ModuleType, output, manual, real_
             next_argv += ["--manual"]
         if args_module:
             next_argv += ["-m"]
-            next_argv += [superclassmodule[superclasspath]]
+            next_argv += [superclass_module[superclass_path]]
         else:
-            next_argv += [str(superclasspath)]
+            next_argv += [str(superclass_path)]
         main(next_argv)
 
     return result
@@ -690,8 +690,8 @@ def props_and_indices_from_msg_class(node: ast.ClassDef):
 
 def find_custom_message_classes(tree, loaded_module: ModuleType, output, manual, real_path: Path,args_module):
     result = []
-    superclasspathlist = set()
-    superclassmodule = {}
+    superclass_path_list = set()
+    superclass_module = {}
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.ClassDef):
@@ -708,15 +708,15 @@ def find_custom_message_classes(tree, loaded_module: ModuleType, output, manual,
                 serializer = getattr(clsobj, "_serializer", None)
                 if serializer in MESSAGE_SUPERCLASSES:
                     superclass = attrgetter(ast.unparse(base))(loaded_module)
-                    superclassname = superclass._fullname
-                    superclasspath = get_class_module_ast(superclass)
-                    if superclasspath not in _visited_paths_msgs:
-                        superclasspathlist.add(superclasspath)
-                        superclassmodule[superclasspath] = str(superclass.__module__)
-                    result.append((node.name, superclassname, node, serializer))
+                    superclass_name = superclass._fullname
+                    superclass_path = get_class_module_ast(superclass)
+                    if superclass_path not in _visited_paths_msgs:
+                        superclass_path_list.add(superclass_path)
+                        superclass_module[superclass_path] = str(superclass.__module__)
+                    result.append((node.name, superclass_name, node, serializer))
 
-    for superclasspath in superclasspathlist:
-        if superclasspath in _visited_paths_msgs:
+    for superclass_path in superclass_path_list:
+        if superclass_path in _visited_paths_msgs:
             continue
         next_argv = []
         if output:
@@ -725,9 +725,9 @@ def find_custom_message_classes(tree, loaded_module: ModuleType, output, manual,
             next_argv += ["--manual"]
         if args_module:
             next_argv += ["-m"]
-            next_argv += [superclassmodule[superclasspath]]
+            next_argv += [superclass_module[superclass_path]]
         else:
-            next_argv += [str(superclasspath)]
+            next_argv += [str(superclass_path)]
         main(next_argv)
 
     return result
