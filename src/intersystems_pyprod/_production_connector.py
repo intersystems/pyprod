@@ -14,15 +14,13 @@ datatype_map = {
 
 iris_reference = type(iris.ref())
 
-def snake_to_camel(s: str) -> str:
+def snake_to_pascal(name: str) -> str:
     # Check if the string is in snake_case
-    if "_" in s and s.lower() == s:
-        parts = s.split("_")
-        # Capitalize each part except the first
-        return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+    if "_" in name and (name.lower() == name or name.upper() == name):
+        return "".join(word.capitalize() for word in name.split("_") if word)
     # Return original if not snake_case
-    return s
-
+    return name
+    
 
 class IRISLog:
 
@@ -116,10 +114,10 @@ class IRISProperty:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return getattr(instance.iris_host_object, self.name, self.default)
+        return getattr(instance.iris_host_object, snake_to_pascal(self.name), self.default)
 
     def __set__(self, instance, value):
-        setattr(instance.iris_host_object, self.name, value)
+        setattr(instance.iris_host_object, snake_to_pascal(self.name), value)
 
     def metadata(self):
         return {
@@ -133,7 +131,7 @@ class IRISProperty:
         desc = ""
         if self.description:
             desc = f"/// {self.description} \n"
-        desc = desc + f"Property {self.name}"
+        desc = desc + f"Property {snake_to_pascal(self.name)}"
         if self.datatype:
             desc = desc + f" As {datatype_map[self.datatype]}"
         else:
@@ -173,9 +171,20 @@ class IRISParameter:
     def __get__(self, instance, owner):
         if instance is None:
             return self
+        
         if self.name == "ADAPTER":
-            return getattr(instance.iris_host_object, "Adapter")
-        return getattr(instance.iris_host_object, self.name, self.value)
+            try:
+                return getattr(instance, "_cached_adapter")
+            except AttributeError:        
+                iris_adapter_object = getattr(instance.iris_host_object, "Adapter")
+
+                if self.value in _BaseClass_registry:
+                    iris_adapter_object = AdapterNamesToPascal(iris_adapter_object)
+
+                setattr(instance, "_cached_adapter", iris_adapter_object)
+                return iris_adapter_object
+
+        return getattr(instance.iris_host_object, snake_to_pascal(self.name), self.value)
 
     def __set__(self, instance, value):
         raise AttributeError(f"{self.name} is a class constant and cannot be modified")
@@ -187,6 +196,71 @@ class IRISParameter:
             "datatype": self.datatype,
             "keyword_list": self.keyword_list,
         }
+
+
+
+class AdapterNamesToPascal:
+
+    """
+    Wraps an outbound adapter object. Any attribute/method access on this wrapper will:
+      1) convert the requested name from snake_case to PascalCase
+      2) forward the operation to the outbound adapter object
+
+    If the forwarded attribute is callable, the wrapper will call it with a SINGLE
+    argument: a string constructed from the caller's *args/**kwargs using repr().
+    """
+    def __init__(self, adapter_object):
+        # Avoid recursion by writing directly to __dict__
+        self.__dict__['_adapter_object'] = adapter_object
+
+    def __getattr__(self, name):
+        """
+        Intercept attribute access.
+        Called only if attribute is NOT found on AdapterNamesToPascal itself.
+        """
+        pascal_name = snake_to_pascal(name)
+
+        attr = getattr(self._adapter_object, pascal_name)
+
+
+
+        if callable(attr):
+            # Wrap method calls so args pass through unchanged
+            def method(*args, **kwargs):
+                arguments = (args, kwargs)
+                
+                response = iris.ref()
+                # arguments can be passed in as a single python object as the boundary between 
+                # BO and out adapter can handle %SYS.Python objects..
+                status = attr(arguments,response)
+
+                response_value = response.value
+                response.value = None
+                del response
+
+                if isinstance(response_value, tuple):
+                    return (status, *response_value)
+                else:
+                    return status, response_value
+            
+            # (optional) easier debugging
+            method.__name__ = name
+            method.__qualname__ = f"{type(self).__name__}.{name}"
+            method.__doc__ = getattr(attr, "__doc__", None)
+
+
+            return method
+
+        return attr
+
+    def __setattr__(self, name, value):
+        """
+        Intercept attribute assignment.
+        """
+        pascal_name = snake_to_pascal(name)
+        setattr(self._adapter_object, pascal_name, value)
+
+
 
 
 class Column:
@@ -294,40 +368,23 @@ class BusinessService(BaseClass):
         super().__init_subclass__(**kwargs)
         cls._hostname = "BusinessService"
 
-    def OnProcessInput(self, input):
-        """
-        The standard signatue is
-        def OnProcessInput(self, input):
-            status = 1
-            ...
-            return status,output
-        must return a status string. This is usually the one received from a SendReq.. call.
-        Alterately, this can be set manually. "1" is for success, uses self.ErrorStatus() to generate error status
-        output is optional
-        :param input: data received either from the inbound adapter or by direct call to the BS
-        """
-        raise NotImplementedError(
-            "OnProcessInput() must be implemented by the subclass"
-        )
-
     def OnProcessInputHelper(self, input):
         # This must return a status and an output in an array
-
-        result = self.OnProcessInput(input)
+        if hasattr(self, "OnProcessInput"):
+            result = self.OnProcessInput(input)
+        elif hasattr(self, "on_process_input"):
+            result = self.on_process_input(input)
+        else:
+            raise NotImplementedError("Subclass must implement OnProcessInput or on_process_input")
+     
         if isinstance(result, (tuple, list)):
             status, output = result
-            return {
-                "status": status,
-                "pOutput": self.request_to_send(output),
-                "pOutput_available": 1,
-            }
+            return {"status": status,"pOutput": self.request_to_send(output),"pOutput_available": 1}
         else:
             status = result
             return {"status": status, "pOutput_available": 0}
 
-    def SendRequestSync(
-        self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""
-    ):
+    def SendRequestSync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
         pResponse = iris.ref()
         pSendSyncHandling = iris.ref()
         status = self.iris_host_object.SendRequestSync(
@@ -360,12 +417,16 @@ class BusinessService(BaseClass):
                 return status
 
         return status
+    
+    def send_request_sync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
+        return self.SendRequestSync(pTargetDispatchName, pRequest, pTimeout, pDescription)
 
     def SendRequestAsync(self, pTargetDispatchName, pRequest, pDescription=""):
-        status = self.iris_host_object.SendRequestAsync(
-            pTargetDispatchName, self.request_to_send(pRequest), pDescription
-        )
+        status = self.iris_host_object.SendRequestAsync(pTargetDispatchName, self.request_to_send(pRequest), pDescription)
         return status
+    
+    def send_request_async(self, pTargetDispatchName, pRequest, pDescription=""):
+        return self.SendRequestAsync(pTargetDispatchName, pRequest, pDescription)
 
 
 class BusinessProcess(BaseClass):
@@ -374,13 +435,16 @@ class BusinessProcess(BaseClass):
         super().__init_subclass__(**kwargs)
         cls._hostname = "BusinessProcess"
 
-    def OnRequest(self, request):
-        ## To be defined by the user
-        pass
-
     def OnRequestHelper(self, request):
         python_request = self._createmessage(message_object=request)
-        result = self.OnRequest(python_request)
+
+        if hasattr(self, "OnRequest"):
+            result = self.OnRequest(python_request)
+        elif hasattr(self, "on_request"):
+            result = self.on_request(python_request)
+        else:
+            raise NotImplementedError("Subclass must implement OnRequest or on_request")
+    
         if isinstance(result, (tuple, list)):
             status, response = result
             return {
@@ -392,25 +456,20 @@ class BusinessProcess(BaseClass):
             status = result
             return {"status": status, "response_available": 0}
 
-    def OnResponse(self, request, response, callrequest, callresponse, pCompletionKey):
-        pass
-
-    def OnResponseHelper(
-        self, request, response, callrequest, callresponse, pCompletionKey
-    ):
+    def OnResponseHelper(self, request, response, callrequest, callresponse, pCompletionKey):
 
         python_request = self._createmessage(message_object=request)
         python_response = self._createmessage(message_object=response)
         python_callrequest = self._createmessage(message_object=callrequest)
         python_callresponse = self._createmessage(message_object=callresponse)
 
-        result = self.OnResponse(
-            python_request,
-            python_response,
-            python_callrequest,
-            python_callresponse,
-            pCompletionKey,
-        )
+
+        if hasattr(self, "OnResponse"):
+            result = self.OnResponse(python_request,python_response,python_callrequest,python_callresponse,pCompletionKey)
+        elif hasattr(self, "on_response"):
+            result = self.on_response(python_request,python_response,python_callrequest,python_callresponse,pCompletionKey)
+        else:
+            raise NotImplementedError("Subclass must implement OnResponse or on_response")
 
         if isinstance(result, (tuple, list)):
             status, response = result
@@ -423,34 +482,16 @@ class BusinessProcess(BaseClass):
             status = result
             return {"status": status, "response_available": 0}
 
-    def SendRequestAsync(
-        self,
-        pTargetDispatchName,
-        pRequest,
-        pResponseRequired=1,
-        pCompletionKey=0,
-        pDescription="",
-    ):
-        status = self.iris_host_object.SendRequestAsync(
-            pTargetDispatchName,
-            self.request_to_send(pRequest),
-            pResponseRequired,
-            pCompletionKey,
-            pDescription,
-        )
+    def SendRequestAsync(self,pTargetDispatchName,pRequest,pResponseRequired=1,pCompletionKey=0,pDescription=""):
+        status = self.iris_host_object.SendRequestAsync(pTargetDispatchName,self.request_to_send(pRequest),pResponseRequired,pCompletionKey,pDescription)
         return status
+    
+    def send_request_async(self,pTargetDispatchName,pRequest,pResponseRequired=1,pCompletionKey=0,pDescription=""):
+        return self.SendRequestAsync(pTargetDispatchName,pRequest,pResponseRequired,pCompletionKey,pDescription)
 
-    def SendRequestSync(
-        self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""
-    ):
+    def SendRequestSync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
         pResponse = iris.ref()
-        status = self.iris_host_object.SendRequestSync(
-            pTargetDispatchName,
-            self.request_to_send(pRequest),
-            pResponse,
-            pTimeout,
-            pDescription,
-        )
+        status = self.iris_host_object.SendRequestSync(pTargetDispatchName,self.request_to_send(pRequest),pResponse,pTimeout,pDescription)
 
         response_value = pResponse.value
         pResponse.value = None
@@ -460,6 +501,9 @@ class BusinessProcess(BaseClass):
             return status, self._createmessage(message_object=response_value)
         else:
             return status
+        
+    def send_request_sync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
+        return self.SendRequestSync( pTargetDispatchName, pRequest, pTimeout, pDescription)
 
 
 class BusinessOperation(BaseClass):
@@ -468,15 +512,16 @@ class BusinessOperation(BaseClass):
         super().__init_subclass__(**kwargs)
         cls._hostname = "BusinessOperation"
 
-    def OnMessage(self, pReq):
-        ## To be defined by the user
-        pass
-
     def OnMessageHelper(self, request, response):
-        # debug_host("192.168.1.48",5549)
+
         python_request = self._createmessage(message_object=request)
 
-        result = self.OnMessage(python_request)
+        if hasattr(self, "OnMessage"):
+            result = self.OnMessage(python_request)
+        elif hasattr(self, "on_message"):
+            result = self.on_message(python_request)
+        else:
+            raise NotImplementedError("Subclass must implement OnMessage or on_message")
 
         if isinstance(result, (tuple, list)):
             status, response = result
@@ -496,18 +541,12 @@ class BusinessOperation(BaseClass):
         result = getattr(self, methodName)(python_request)
         if isinstance(result, (tuple, list)):
             status, response = result
-            return {
-                "response": self.request_to_send(response),
-                "status": status,
-                "response_available": 1,
-            }
+            return {"response": self.request_to_send(response),"status": status,"response_available": 1}
         else:
             status = result
             return {"status": status, "response_available": 0}
 
-    def SendRequestSync(
-        self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""
-    ):
+    def SendRequestSync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
         pResponse = iris.ref()
         status = self.iris_host_object.SendRequestSync(
             pTargetDispatchName,
@@ -525,12 +564,16 @@ class BusinessOperation(BaseClass):
             return status, self._createmessage(message_object=response_value)
         else:
             return status
+        
+    def send_request_sync(self, pTargetDispatchName, pRequest, pTimeout=-1, pDescription=""):
+        return self.SendRequestSync(pTargetDispatchName, pRequest, pTimeout, pDescription)
 
     def SendRequestAsync(self, pTargetDispatchName, pRequest, pDescription=""):
-        status = self.iris_host_object.SendRequestAsync(
-            pTargetDispatchName, self.request_to_send(pRequest), pDescription
-        )
+        status = self.iris_host_object.SendRequestAsync(pTargetDispatchName, self.request_to_send(pRequest), pDescription)
         return status
+    
+    def send_request_async(self, pTargetDispatchName, pRequest, pDescription=""):
+        return self.SendRequestAsync(pTargetDispatchName, pRequest, pDescription)
 
 
 class InboundAdapter(BaseClass):
@@ -539,11 +582,15 @@ class InboundAdapter(BaseClass):
         super().__init_subclass__(**kwargs)
         cls._hostname = "InboundAdapter"
 
-    def OnTask():
-        raise NotImplementedError(
-            "OnTask() must be implemented by the subclass. This only returns a status"
-        )
 
+    def OnTaskHelper(self):
+        if hasattr(self, "OnTask"):
+            return self.OnTask()
+        elif hasattr(self, "on_task"):
+            return self.on_task()
+        else:
+            raise NotImplementedError("Subclass must implement OnTask or on_task")
+    
     def BusinessHost_ProcessInput(self, pInput, InHint=""):
         
         pOutput = iris.ref()
@@ -570,11 +617,28 @@ class InboundAdapter(BaseClass):
             else:
                 return status
 
-
+    def business_host_process_input(self, pInput, InHint=""):
+        return self.BusinessHost_ProcessInput(pInput, InHint)
+    
 class OutboundAdapter(BaseClass):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         cls._hostname = "OutboundAdapter"
+
+    def AnyMethodHelper(self, arguments, methodName):
+
+        args, kwargs = arguments
+        
+        result = getattr(self, methodName)(*args, **kwargs)
+
+        if isinstance(result, (tuple, list)):
+            status = result[0]
+            response = result[1:]
+            return {"response": response,"status": status,"response_available": 1}
+        else:
+            status = result
+            return {"status": status, "response_available": 0}
+            
 
 
 def debug_host(ip: str, port: int = 5547) -> None:
@@ -659,9 +723,7 @@ class ProductionMessage:
             raise TypeError("iris_message_object or json_str_or_dict both need to be provided.")
 
         if (args or kwargs) and (iris_message_object or json_str_or_dict):
-            raise TypeError(
-                "Either provide only iris_message_object + json_str_or_dict, or use args/kwargs to create a new object."
-            )
+            raise TypeError("Either provide only iris_message_object + json_str_or_dict, or use args/kwargs to create a new object.")
 
         # Grabs the actual class of the instance you’re initializing.ou want to inspect the annotations on whatever subclass 
         # you’re in (e.g. NewMsgType), not on ProductionMessage itself. Using type(self) makes it generic for any subclass.
@@ -675,7 +737,7 @@ class ProductionMessage:
             # service from the productions UI. Here, the json_str_or_dict would be empty. 
             if json_str_or_dict == "":
                 for name in cls._column_field_names:
-                    if (val:=getattr(iris_message_object,snake_to_camel(name))) is not "":
+                    if (val:=getattr(iris_message_object,snake_to_pascal(name))) != "":
                         setattr(self, name, val)
             else:
                 if serializer != "pickle":
@@ -858,7 +920,7 @@ class JsonSerialize(ProductionMessage):
 
     def create_iris_message_object_properties(self, message_object):
         for prop in self._column_field_names:
-            setattr(message_object, snake_to_camel(prop), self.__dict__[prop])
+            setattr(message_object, snake_to_pascal(prop), self.__dict__[prop])
 
 
 def unpickle_binary(iris_message_object,MsgCls):
@@ -884,7 +946,7 @@ def unpickle_binary(iris_message_object,MsgCls):
         else: 
             thisobject = MsgCls()
             for name in thisobject._column_field_names:
-                if (val:=getattr(iris_message_object,name)) is not "":
+                if (val:=getattr(iris_message_object,name)) != "":
                     setattr(thisobject, name, val)
     return thisobject
 
@@ -943,4 +1005,4 @@ class PickleSerialize(ProductionMessage):
 
     def create_iris_message_object_properties(self, message_object):
         for prop in self._column_field_names:
-            setattr(message_object, snake_to_camel(prop), self.__dict__[prop])
+            setattr(message_object, snake_to_pascal(prop), self.__dict__[prop])

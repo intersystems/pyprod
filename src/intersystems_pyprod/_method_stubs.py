@@ -90,7 +90,7 @@ Method OnInit() As %Status
 Method OnTask() As %Status
 {{
     try{{
-        s status = ..PythonClassObject.OnTask()
+        s status = ..PythonClassObject.OnTaskHelper()
     }} catch e {{
         set status = $system.Status.Error(5001, e.AsSystemError())
         $$$LOGERROR(status)
@@ -205,7 +205,7 @@ Method OnTearDown() As %Status
 "BusinessOperation": {
     # Any method for a business operation will have the same custom stub as follows.
         "AnyMethod": """
-Method {MethodName}(pRequest As %Library.Persistent, Output pResponse As %Library.Persistent) As %Status
+Method {MethodNameModified}(pRequest As %Library.Persistent, Output pResponse As %Library.Persistent) As %Status
 {{
     try{{
           Set arr = ..PythonClassObject.AnyMethodHelper(pRequest,"{MethodName}")
@@ -224,7 +224,7 @@ Method {MethodName}(pRequest As %Library.Persistent, Output pResponse As %Librar
 """
 ,
 "OnMessage": """
-Method {MethodName}(pRequest As %Library.Persistent, Output pResponse As %Library.Persistent) As %Status
+Method OnMessage(pRequest As %Library.Persistent, Output pResponse As %Library.Persistent) As %Status
 {{
     try{{
           Set arr = ..PythonClassObject.OnMessageHelper(pRequest,pResponse)
@@ -247,15 +247,19 @@ Method {MethodName}(pRequest As %Library.Persistent, Output pResponse As %Librar
     "OutboundAdapter":{
         # Any method for an outbound adapter will have the same custom stub as follows.
         "AnyMethod":"""
-Method {MethodName}({Arguments}) As %Status
+
+Method {MethodNameModified}(arguments As %Library.RegisteredObject, Output pResponse As %Library.RegisteredObject) As %Status
 {{
-    s status = $$$OK
     try{{
-        set status = ..PythonClassObject.{MethodName}({Arguments})
-    }}catch e {{
-        set status = $system.Status.Error(5001, e.AsSystemError())
-        $$$LOGERROR(status)
-    }}
+          Set arr = ..PythonClassObject.AnyMethodHelper(arguments,"{MethodName}")
+          set status = arr."__getitem__"("status")
+          if arr."__getitem__"("response_available"){{
+            set pResponse = arr."__getitem__"("response") 
+            }}
+      }} catch e {{
+          set status = $system.Status.Error(5001, e.AsSystemError())
+          $$$LOGERROR(status)
+      }}
     Quit status
 }}
 

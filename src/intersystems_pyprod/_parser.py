@@ -30,14 +30,13 @@ DATATYPE_MAP = {"str": "%VarString", "int": "%Integer", "bool": "%Boolean"}
 DATATYPE_MAP_Parameters = {"str": "STRING", "int": "INTEGER", "bool": "BOOLEAN"}
 
 
-def snake_to_camel(s: str) -> str:
+def snake_to_pascal(name: str) -> str:
     # Check if the string is in snake_case
-    if "_" in s and s.lower() == s:
-        parts = s.split("_")
-        # Capitalize each part except the first
-        return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+    if "_" in name and (name.lower() == name or name.upper() == name):
+        return "".join(word.capitalize() for word in name.split("_") if word)
     # Return original if not snake_case
-    return s
+    return name
+    
 
 def extract_package_name(tree, default_name):
     for node in tree.body:
@@ -244,16 +243,18 @@ def generate_custom_classes(tree, script_name, folder_name, package_name, output
 
         methods = [oninit]
         super_stubs = STUBS.get(hostname, {})
+        PascalName = ""
 
         for child in node.body:
             if isinstance(child, ast.FunctionDef):
                 name = child.name
                 args_string = get_args(child)
-                if name in super_stubs:
-                    stub_tmpl = super_stubs[name]
+                if snake_to_pascal(name) in super_stubs:
+                    stub_tmpl = super_stubs[snake_to_pascal(name)]
                 elif (hostname == "BusinessOperation" and name not in message_map_methods):
                     continue
                 elif (hostname in ("BusinessOperation", "OutboundAdapter") and "AnyMethod" in super_stubs):
+                    PascalName = snake_to_pascal(name)
                     stub_tmpl = super_stubs["AnyMethod"]
                 else:
                     continue
@@ -264,6 +265,7 @@ def generate_custom_classes(tree, script_name, folder_name, package_name, output
                     PythonLibrary=python_library,
                     Superclass=supercls,
                     MethodName=name,
+                    MethodNameModified = PascalName,
                     Arguments=args_string,
                     ScriptPath=script_path,
                     ScriptName=script_name,
@@ -353,7 +355,7 @@ def extract_params(node: ast.ClassDef):
             continue
 
         
-        param_name = target_node.id
+        param_name = snake_to_pascal(target_node.id)
 
 
         from_args= {}
@@ -411,7 +413,7 @@ def message_map_xdata(MessageMap):
 
     for msg_type, method in MessageMap.items():
         output.append(f'    <MapItem MessageType="{msg_type}">')
-        output.append(f"      <Method>{method}</Method>")
+        output.append(f"      <Method>{snake_to_pascal(method)}</Method>")
         output.append("    </MapItem>")
 
     output.append("  </MapItems>")
@@ -464,7 +466,7 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
         ):
             continue
 
-        prop_name = target_node.id
+        prop_name = snake_to_pascal(target_node.id)
 
         from_args= {}
         IRISProperty_PARAM_ORDER = [ "default", "datatype", "description", "settings"]
@@ -553,16 +555,18 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
 
         methods = [oninit]
         super_stubs = STUBS.get(supercls, {})
+        PascalName = ""
 
         for child in node.body:
             if isinstance(child, ast.FunctionDef):
                 name = child.name
                 args_string = get_args(child)
-                if name in super_stubs:
-                    stub_tmpl = super_stubs[name]
+                if snake_to_pascal(name) in super_stubs: # this will take care of OnMessage and on_message in a business operation... 
+                    stub_tmpl = super_stubs[snake_to_pascal(name)]
                 elif (supercls == "BusinessOperation" and name not in message_map_methods):
                     continue
                 elif (supercls in ("BusinessOperation", "OutboundAdapter") and "AnyMethod" in super_stubs):
+                    PascalName = snake_to_pascal(name)
                     stub_tmpl = super_stubs["AnyMethod"]
                 else:
                     continue
@@ -573,6 +577,7 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
                     PythonLibrary=python_library,
                     Superclass=supercls,
                     MethodName=name,
+                    MethodNameModified = PascalName,
                     Arguments=args_string,
                     ScriptPath=script_path,
                     ScriptName=script_name,
@@ -639,7 +644,7 @@ def props_and_indices_from_msg_class(node: ast.ClassDef):
         ):
             continue
 
-        prop_name = snake_to_camel(target_node.id)
+        prop_name = snake_to_pascal(target_node.id)
 
 
         from_args= {}
