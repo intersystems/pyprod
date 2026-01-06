@@ -705,15 +705,15 @@ def find_custom_message_classes(tree, loaded_module: ModuleType, output, manual,
 
             clsobj = getattr(loaded_module, node.name, None)
             if clsobj is not None:
-                serializer = getattr(clsobj, "_serializer", None)
-                if serializer in MESSAGE_SUPERCLASSES:
+                serializer_class = getattr(clsobj, "_serializer_class", None)
+                if serializer_class in MESSAGE_SUPERCLASSES:
                     superclass = attrgetter(ast.unparse(base))(loaded_module)
                     superclass_name = superclass._fullname
                     superclass_path = get_class_module_ast(superclass)
                     if superclass_path not in _visited_paths_msgs:
                         superclass_path_list.add(superclass_path)
                         superclass_module[superclass_path] = str(superclass.__module__)
-                    result.append((node.name, superclass_name, node, serializer))
+                    result.append((node.name, superclass_name, node, serializer_class))
 
     for superclass_path in superclass_path_list:
         if superclass_path in _visited_paths_msgs:

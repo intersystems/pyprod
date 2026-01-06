@@ -664,10 +664,8 @@ class ProductionMessage:
     """
 
 
-    __slots__ = ("_iris_message_wrapper", "_serializer")
+    __slots__ = ("_iris_message_wrapper")
 
-    # subclass hook: runs once when each subclass is defined
-    # Used here to just get the package name.
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
@@ -714,22 +712,18 @@ class ProductionMessage:
                         setattr(self, name, val)
             else:
                 if serializer != "pickle":
+                    import json
                     # building using iris_message_object and json_str_or_dict. This is primarily to be used by IRIS side.
-                    data = (
-                        json_str_or_dict
-                        if isinstance(json_str_or_dict, dict)
-                        else __import__(serializer).loads(json_str_or_dict)
-                    )
-                    for name in field_names:
-                        if name in data:
-                            values[name] = data[name]
+                    data = (json_str_or_dict if isinstance(json_str_or_dict, dict)
+                        else json.loads(json_str_or_dict))
+
                     # 3) For each field, decide its runtime default:
                     #  Note: We do not re-instantiate defaults as we assume that the json_str_or_dict is populated as expected, and in case
                     #  there is a missing field, it is by design....
                     for name in field_names:
-                        if name in values:
-                            val = values[name]
-                            setattr(self, name, val)
+                        if name in data:
+                            setattr(self, name, data[name])
+                            
         else:
 
             package_name = cls._package
@@ -768,7 +762,6 @@ class ProductionMessage:
 
         # 5) Link the Python object to the IRIS wrapper:
         object.__setattr__(self, "_iris_message_wrapper", iris_message_object)
-        object.__setattr__(self, "_serializer", serializer)
 
 
     @staticmethod
@@ -778,8 +771,8 @@ class ProductionMessage:
     @classmethod
     def _class_body_field_order_top_level(cls):
         """Return names in the exact order they appear in the top-level class body.
-        Handles both 'AnnAssign' (e.g., 'Name: T' or 'Name: T = v') and 'Assign'
-        (e.g., 'Name = v'). Does NOT descend into nested classes."""
+        Handles both "AnnAssign" (e.g., "Name: T" or "Name: T = v") and "Assign"
+        (e.g., "Name = v"). Does NOT descend into nested classes."""
         src = inspect.getsource(cls)
         mod = ast.parse(src)
         # find the top-level ClassDef with this name
@@ -834,7 +827,7 @@ class JsonSerialize(ProductionMessage):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        cls._serializer = "JsonSerialize"
+        cls._serializer_class = "JsonSerialize"
     
     def __init__(self,*args,iris_message_object=None,json_str_or_dict=None,serializer="json",**kwargs,):
         if (iris_message_object is not None) and (json_str_or_dict is None):
@@ -851,23 +844,13 @@ class JsonSerialize(ProductionMessage):
             json_str = "".join(chunks)
 
             json_str_or_dict = json_str
-        super().__init__(
-            *args,
-            iris_message_object=iris_message_object,
-            json_str_or_dict=json_str_or_dict,
-            serializer=serializer,
-            **kwargs,
-        )
+        super().__init__(*args,iris_message_object=iris_message_object,json_str_or_dict=json_str_or_dict,
+            serializer=serializer,**kwargs,)
 
     def chunks_from_python(self, iteration, start, end):
         if iteration == 0:
             import json
-
-            object.__setattr__(
-                self,
-                "_serial_stream",
-                __import__(self._serializer).dumps(self.__dict__),
-            )
+            object.__setattr__(self, "_serial_stream", json.dumps(self.__dict__))
         return object.__getattribute__(self, "_serial_stream")[start:end]
 
     @property
@@ -926,18 +909,14 @@ class PickleSerialize(ProductionMessage):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        cls._serializer = "PickleSerialize"
+        cls._serializer_class = "PickleSerialize"
 
     def __init__(self, *args, iris_message_object=None, **kwargs):
         ## initialize _serial_stream to empty string as it is only temporarily holding a value, before and after that it must stay empty
         object.__setattr__(self, "_serial_stream", "")
-        super().__init__(
-                *args,
-                iris_message_object=iris_message_object,
-                json_str_or_dict=None,
-                serializer="pickle",
-                **kwargs,
-            )
+        super().__init__(*args,iris_message_object=iris_message_object,json_str_or_dict=None,
+                         serializer="pickle",**kwargs,
+                         )
 
     def chunks_from_python(self, iteration, start, end):
 
@@ -946,9 +925,7 @@ class PickleSerialize(ProductionMessage):
 
             temp = self._iris_message_wrapper
             self._iris_message_wrapper = ""  ## can't pickle this
-            object.__setattr__(
-                self,
-                "_serial_stream",
+            object.__setattr__(self,"_serial_stream",
                 pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL, fix_imports=False),
             )
             self._iris_message_wrapper = temp
