@@ -848,10 +848,22 @@ class JsonSerialize(ProductionMessage):
             serializer=serializer,**kwargs,)
 
     def chunks_from_python(self, iteration, start, end):
+
+        """
+        Return a slice of the serialized JSON payload for this message.
+
+        Field-name based: we serialize only declared message fields (cls._field_names),
+        not self.__dict__, so internal attributes and accidental extras are excluded.
+        """
         if iteration == 0:
             import json
-            object.__setattr__(self, "_serial_stream", json.dumps(self.__dict__))
+
+            cls = type(self)
+            data = {name: getattr(self, name) for name in cls._field_names}
+            object.__setattr__(self, "_serial_stream", json.dumps(data))
+
         return object.__getattribute__(self, "_serial_stream")[start:end]
+    
 
     @property
     def iris_message_object(self):
@@ -875,7 +887,7 @@ class JsonSerialize(ProductionMessage):
 
     def create_iris_message_object_properties(self, message_object):
         for prop in self._column_field_names:
-            setattr(message_object, snake_to_pascal(prop), self.__dict__[prop])
+            setattr(message_object, snake_to_pascal(prop), getattr(self, prop))
 
 
 def unpickle_binary(iris_message_object,MsgCls):
@@ -952,4 +964,4 @@ class PickleSerialize(ProductionMessage):
 
     def create_iris_message_object_properties(self, message_object):
         for prop in self._column_field_names:
-            setattr(message_object, snake_to_pascal(prop), self.__dict__[prop])
+            setattr(message_object, snake_to_pascal(prop), getattr(self, prop))
