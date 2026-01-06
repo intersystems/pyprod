@@ -245,7 +245,7 @@ class Column:
     """
 
     def __init__(
-        self, *, default=None, datatype=None, description=None, index=False, **kwargs
+        self, default=None, datatype=None, description=None, index=False, **kwargs
     ):
         self.default = default
         self.index = bool(index)
