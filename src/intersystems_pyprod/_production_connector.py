@@ -909,6 +909,14 @@ def unpickle_binary(iris_message_object,MsgCls):
 
 
 class PickleSerialize(ProductionMessage):
+
+    """
+    NOTE:
+    This class relies on Python's pickle module.
+    Never unpickle data from untrusted or unauthenticated sources,
+    as pickle deserialization can execute arbitrary code.
+    """
+        
     __slots__ = ("_serial_stream",)
 
     def __init_subclass__(cls, **kwargs):
