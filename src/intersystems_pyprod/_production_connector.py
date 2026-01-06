@@ -3,19 +3,11 @@ import importlib
 import inspect
 import pickle
 import sys
-from typing import get_type_hints
 
 import iris
 
-datatype_map = {
-    "int": "%Integer",
-    "str": "%VarString",
-}
-
 # increasing this to a higher value can lead to <MAXSTRING> error in IRIS
 BELOW_MAX_STRING = 3 * 1024 * 1024
-
-iris_reference = type(iris.ref())
 
 def snake_to_pascal(name: str) -> str:
     # Check if the string is in snake_case
@@ -376,15 +368,15 @@ class BusinessService(BaseClass):
         del response
         del send_sync_handling
 
-        if send_sync_handling_value != None:
-            if response_value != None:
+        if send_sync_handling_value is not None:
+            if response_value is not None:
                 return (
                     status,
                     self._createmessage(message_object=response_value),
                     send_sync_handling_value,
                 )
         else:
-            if response_value != None:
+            if response_value is not None:
                 return status, self._createmessage(message_object=response_value)
             else:
                 return status
@@ -470,7 +462,7 @@ class BusinessProcess(BaseClass):
         response.value = None
         del response
 
-        if response_value != None:
+        if response_value is not None:
             return status, self._createmessage(message_object=response_value)
         else:
             return status
@@ -533,7 +525,7 @@ class BusinessOperation(BaseClass):
         response.value = None
         del response
 
-        if response_value != None:
+        if response_value is not None:
             return status, self._createmessage(message_object=response_value)
         else:
             return status
