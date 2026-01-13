@@ -93,10 +93,16 @@ class IRISProperty:
         The default value to emit as [InitialExpression = ...] in the generated OS code.
     settings : str
         A string which will appear as is in the Parameter SETTINGS that is generated in the OS code.
-        https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=EGDV_prog#EGDV_prog_settings_options
+        https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=EGDV_prog#EGDV_prog_settings_category
+        cases
+        1. settings = ""                   :   Adds the IRISProperty to the UI as an empty text box
+        2. settings = "category"           :   Adds the IRISProperty to the UI under the category name, as an empty text box
+        3. settings = "category:control"   :   Adds the IRISProperty to the UI under the category name, as the stated control
+        4. settings = ":control"           :   Adds the IRISProperty to the UI, as the stated control
+        5. settings = "-"                  :   Removes any inherited property by this name from the UI
     """
 
-    def __init__(self, default=None, datatype="%VarString", description="", settings=""):
+    def __init__(self, default=None, datatype="%VarString", description="", settings=None):
         self.datatype = datatype
         self.description = description
         self.default = default

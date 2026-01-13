@@ -53,7 +53,7 @@ class CustomInAdapter(InboundAdapter):
 
 class CustomBS(BusinessService):
 
-    TargetConfigName = IRISProperty(description="Name of Host as seen in the production", settings="TargetConfigName:Target")
+    TargetConfigName = IRISProperty(description="Name of Host as seen in the production", settings="Target")
 
     DummyParam = IRISParameter("constant param",description="Used to demostrate parameter use")
 
@@ -74,7 +74,7 @@ class CustomBS(BusinessService):
 class CustomBP(BusinessProcess):
 
     TargetConfigName: str = IRISProperty(
-        settings="TargetConfigName:Target:selector?context={Ens.ContextSearch/ProductionItems?targets=1&productionName=@productionId}"
+        settings="Target:selector?context={Ens.ContextSearch/ProductionItems?targets=1&productionName=@productionId}"
     )
 
     def OnRequest(self, request):

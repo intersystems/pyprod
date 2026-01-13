@@ -24,7 +24,7 @@ class MyPickleData(PickleSerialize):
     amount = 1
 
 class AdapterlessBS(BusinessService):
-    TargetConfigName = IRISProperty(settings="TargetConfigName:Target")
+    TargetConfigName = IRISProperty(settings="Target")
     def OnProcessInput(self, input):
         status = Status.OK()
         msg = MyJsonData(input)
@@ -32,7 +32,7 @@ class AdapterlessBS(BusinessService):
         return status, response
     
 class CustomBP(BusinessProcess):
-    TargetConfigName: str = IRISProperty(settings="TargetConfigName:Target")
+    TargetConfigName: str = IRISProperty(settings="Target")
     def OnRequest(self, request):
         status = Status.OK()
         if request.name == "testMyJson" :

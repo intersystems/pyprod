@@ -480,7 +480,20 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
         default = from_args.get("default",kw.get("default", None))
         dtype = from_args.get("datatype",kw.get("datatype", None))
         desc = from_args.get("description",kw.get("description", None))
-        setting = from_args.get("settings",kw.get("settings", None))
+        prop_setting = from_args.get("settings",kw.get("settings", None))
+
+        if prop_setting is not None:
+            setting = ":".join(part.strip() for part in prop_setting.split(":"))
+            if setting == "-":
+                settings.append(f"-{prop_name}")
+                continue # don't generate a Property in the backend as we intend to remove an inherited IRIS property from the UI
+            if setting == "":
+                settings.append(prop_name)
+            else:
+                settings.append(f"{prop_name}:{setting}")
+
+
+
 
         if dtype is None and ann is not None:
             dtype = ast.unparse(ann)
@@ -502,8 +515,7 @@ def extract_props_and_settings(node: ast.ClassDef, real_path):
         line += "; \n"
         props.append(line)
 
-        if setting:
-            settings.append(setting)
+
 
     return props, settings, message_map_method
 

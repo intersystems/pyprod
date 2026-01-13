@@ -9,7 +9,7 @@ class simplemsg(JsonSerialize):
 
 class TCPBusinessService(BusinessService):
     ADAPTER = IRISParameter("EnsLib.TCP.TextLineInboundAdapter")
-    TargetConfig = IRISProperty(settings="TargetConfig:SelectTarget")
+    TargetConfig = IRISProperty(settings="SelectTarget")
     def OnProcessInput(self, input):
         status = Status.OK()
         mymsg = simplemsg()
