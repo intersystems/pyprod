@@ -13,7 +13,7 @@ from intersystems_pyprod import (
     debug_host,
 )
 
-package_name = "AllPyComponents"
+iris_package_name = "AllPyComponents"
 
 class MyJsonData(JsonSerialize):
     name = Column(default="default name")

@@ -16,7 +16,7 @@ from intersystems_pyprod import (
     debug_host,
 )
 
-package_name = "QuickStart"
+iris_package_name = "QuickStart"
 
 class TempData:
     def __init__(self, Name: str, Amount: int):

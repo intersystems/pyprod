@@ -38,11 +38,11 @@ def snake_to_pascal(name: str) -> str:
     return name
     
 
-def extract_package_name(tree, default_name):
+def extract_iris_package_name(tree, default_name):
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "package_name":
+                if isinstance(target, ast.Name) and target.id == "iris_package_name":
                     if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
                         return node.value.value
     return default_name
@@ -126,7 +126,7 @@ def load_to_iris(cls_string, cls_name):
 
         import iris
 
-        print(f"Loading {cls_name} to IRIS...")
+        print(f"\n\nLoading {cls_name} to IRIS...")
         iris_stream = iris._Stream.GlobalCharacter._New()
         iris_stream.Write(cls_string)
         iris._SYSTEM.OBJ.LoadStream(iris_stream, "ck")
@@ -205,7 +205,7 @@ def detect_custom_classes(tree, loaded_module: ModuleType, output, manual, real_
     return result
 
 
-def generate_custom_classes(tree, script_name, folder_name, package_name, output, script_path, manual, real_path, python_library, loaded_module: ModuleType,args_module):
+def generate_custom_classes(tree, script_name, folder_name, iris_package_name, output, script_path, manual, real_path, python_library, loaded_module: ModuleType,args_module):
     classes = detect_custom_classes(tree, loaded_module, output, manual, real_path,args_module)
     if not classes:
         return
@@ -225,7 +225,7 @@ def generate_custom_classes(tree, script_name, folder_name, package_name, output
         if hostname == "BusinessProcess":
             oninit = bp_oninit.format(
                 ClassName=cls_name,
-                PackageName=package_name,
+                PackageName=iris_package_name,
                 PythonLibrary=python_library,
                 Superclass=supercls,
                 ScriptPath=script_path,
@@ -234,7 +234,7 @@ def generate_custom_classes(tree, script_name, folder_name, package_name, output
         else:
             oninit = common_oninit.format(
                 ClassName=cls_name,
-                PackageName=package_name,
+                PackageName=iris_package_name,
                 PythonLibrary=python_library,
                 Superclass=supercls,
                 ScriptPath=script_path,
@@ -261,7 +261,7 @@ def generate_custom_classes(tree, script_name, folder_name, package_name, output
 
                 content_stub = stub_tmpl.format(
                     ClassName=cls_name,
-                    PackageName=package_name,
+                    PackageName=iris_package_name,
                     PythonLibrary=python_library,
                     Superclass=supercls,
                     MethodName=name,
@@ -276,7 +276,7 @@ def generate_custom_classes(tree, script_name, folder_name, package_name, output
 
         content = class_tmpl.format(
             ClassName=cls_name,
-            PackageName=package_name,
+            PackageName=iris_package_name,
             Superclass=supercls,
             props=props_block,
             params=params_block,
@@ -285,7 +285,7 @@ def generate_custom_classes(tree, script_name, folder_name, package_name, output
 
         if manual and not output:
             script_path = Path(script_path).resolve()
-            output = script_path / f"{package_name}_classes"
+            output = script_path / f"{iris_package_name}_classes"
             output.mkdir(parents=True, exist_ok=True)
 
         if output:
@@ -531,7 +531,7 @@ def find_ossubclasses(tree):
     return result
 
 
-def generate_os_classes(tree, script_name, folder_name, package_name, output, script_path, manual, real_path, python_library):
+def generate_os_classes(tree, script_name, folder_name, iris_package_name, output, script_path, manual, real_path, python_library):
     classes = find_ossubclasses(tree)
     class_tmpl = STUBS.get("ClassDefinition")
     common_oninit = STUBS.get("Common", {}).get("OnInit", "")
@@ -549,7 +549,7 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
         if supercls == "BusinessProcess":
             oninit = bp_oninit.format(
                 ClassName=cls_name,
-                PackageName=package_name,
+                PackageName=iris_package_name,
                 PythonLibrary=python_library,
                 Superclass=supercls,
                 ScriptPath=script_path,
@@ -558,7 +558,7 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
         else:
             oninit = common_oninit.format(
                 ClassName=cls_name,
-                PackageName=package_name,
+                PackageName=iris_package_name,
                 PythonLibrary=python_library,
                 Superclass=supercls,
                 ScriptPath=script_path,
@@ -585,7 +585,7 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
 
                 content_stub = stub_tmpl.format(
                     ClassName=cls_name,
-                    PackageName=package_name,
+                    PackageName=iris_package_name,
                     PythonLibrary=python_library,
                     Superclass=supercls,
                     MethodName=name,
@@ -600,7 +600,7 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
 
         content = class_tmpl.format(
             ClassName=cls_name,
-            PackageName=package_name,
+            PackageName=iris_package_name,
             Superclass="Ens." + supercls,
             props=props_block,
             params=params_block,
@@ -609,7 +609,7 @@ def generate_os_classes(tree, script_name, folder_name, package_name, output, sc
 
         if manual and not output:
             script_path = Path(script_path).resolve()
-            output = script_path / f"{package_name}_classes"
+            output = script_path / f"{iris_package_name}_classes"
             output.mkdir(parents=True, exist_ok=True)
 
         if output:
@@ -744,7 +744,7 @@ def find_custom_message_classes(tree, loaded_module: ModuleType, output, manual,
 
     return result
 
-def generate_custom_msg_wrappers(tree, script_name, folder_name, package_name, python_library, output, script_path, manual, real_path, loaded_module: ModuleType,args_module):
+def generate_custom_msg_wrappers(tree, script_name, folder_name, iris_package_name, python_library, output, script_path, manual, real_path, loaded_module: ModuleType,args_module):
     classes = find_custom_message_classes(tree, loaded_module, output, manual, real_path,args_module)
     if not classes:
         return
@@ -761,7 +761,7 @@ def generate_custom_msg_wrappers(tree, script_name, folder_name, package_name, p
             continue
         content = stub.format(
             ClassName=cls,
-            PackageName=package_name,
+            PackageName=iris_package_name,
             PythonLibrary=python_library,
             ScriptPath=script_path,
             ScriptName=script_name,
@@ -772,7 +772,7 @@ def generate_custom_msg_wrappers(tree, script_name, folder_name, package_name, p
 
         if manual and not output:
             script_path = Path(script_path).resolve()
-            output = script_path / f"{package_name}_classes"
+            output = script_path / f"{iris_package_name}_classes"
             output.mkdir(parents=True, exist_ok=True)
 
         if output:
@@ -811,7 +811,7 @@ def find_message_classes(source):
     return result
 
 
-def generate_msg_wrappers(tree, script_name, folder_name, package_name, python_library, output, script_path, manual):
+def generate_msg_wrappers(tree, script_name, folder_name, iris_package_name, python_library, output, script_path, manual):
     classes = find_message_classes(tree)
     all_classes = {}
     for cls, superclass_name, node in classes:
@@ -826,7 +826,7 @@ def generate_msg_wrappers(tree, script_name, folder_name, package_name, python_l
             continue
         content = stub.format(
             ClassName=cls,
-            PackageName=package_name,
+            PackageName=iris_package_name,
             PythonLibrary=python_library,
             ScriptPath=script_path,
             ScriptName=script_name,
@@ -836,7 +836,7 @@ def generate_msg_wrappers(tree, script_name, folder_name, package_name, python_l
 
         if manual and not output:
             script_path = Path(script_path).resolve()
-            output = script_path / f"{package_name}_classes"
+            output = script_path / f"{iris_package_name}_classes"
             output.mkdir(parents=True, exist_ok=True)
 
         if output:
@@ -942,7 +942,7 @@ def main(argv: list[str] = None):
 
     # Keep existing behaviour: if not inside package, fallback to script dir name or script name
     folder_name = os.path.basename(os.path.dirname(os.path.abspath(real_path))) or real_path.stem
-    package_name = extract_package_name(tree, real_path.stem)
+    iris_package_name = extract_iris_package_name(tree, real_path.stem)
     python_library = module_name  # fully qualified module path
 
     if args.output:
@@ -957,7 +957,7 @@ def main(argv: list[str] = None):
         tree,
         script_name,
         folder_name,
-        package_name,
+        iris_package_name,
         python_library,
         args.output,
         script_path,
@@ -969,7 +969,7 @@ def main(argv: list[str] = None):
         tree,
         script_name,
         folder_name,
-        package_name,
+        iris_package_name,
         python_library,
         args.output,
         script_path,
@@ -984,7 +984,7 @@ def main(argv: list[str] = None):
         tree,
         script_name,
         folder_name,
-        package_name,
+        iris_package_name,
         args.output,
         script_path,
         args.manual,
@@ -997,7 +997,7 @@ def main(argv: list[str] = None):
         tree,
         script_name,
         folder_name,
-        package_name,
+        iris_package_name,
         args.output,
         script_path,
         args.manual,

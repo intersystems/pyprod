@@ -2,7 +2,7 @@ from intersystems_pyprod import ( IRISParameter, IRISProperty,Status,
     BusinessService, BusinessOperation, JsonSerialize,IRISLog)
 
 
-package_name = "TCPAdaptersFromOs"
+iris_package_name = "TCPAdaptersFromOs"
 
 class simplemsg(JsonSerialize):
     value: str

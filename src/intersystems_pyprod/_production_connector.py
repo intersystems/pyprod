@@ -275,19 +275,19 @@ class BaseClass:
         super().__init_subclass__(**kwargs)
 
         # Look first for a class-level override:
-        pkg = getattr(cls, "package_name", None)
+        pkg = getattr(cls, "iris_package_name", None)
         if pkg is None:
             # Next, look for a module-level override. In this case, the package name must have been defined closer to the top:
             mod = importlib.import_module(cls.__module__)
-            pkg = getattr(mod, "package_name", None)
+            pkg = getattr(mod, "iris_package_name", None)
 
         if pkg is None:
             # Fallback to the filename of the module:
             pkg = cls.__module__.split(".")[-1]
 
         # Cache it on the class object, in the class’s internal __dict__, for instant lookup later:
-        cls._package = pkg
-        cls._fullname = cls._package + "." + cls.__name__
+        cls._iris_package = pkg
+        cls._fullname = cls._iris_package + "." + cls.__name__
         # register every user subclass by its __name__. This is later used in Host classes for
         # generating objects dynamically at runtime based on incoming message type...
         _BaseClass_registry[cls._fullname] = cls
@@ -668,19 +668,19 @@ class ProductionMessage:
         super().__init_subclass__(**kwargs)
 
         # Look first for a class-level override:
-        pkg = getattr(cls, "package_name", None)
+        pkg = getattr(cls, "iris_package_name", None)
         if pkg is None:
             # Next, look for a module-level override. In this case, the package name must have been defined closer to the top:
             mod = importlib.import_module(cls.__module__)
-            pkg = getattr(mod, "package_name", None)
+            pkg = getattr(mod, "iris_package_name", None)
 
         if pkg is None:
             # Fallback to the filename of the module:
             pkg = cls.__module__.split(".")[-1]
 
         # Cache it on the class object, in the class’s internal __dict__, for instant lookup later:
-        cls._package = pkg
-        cls._fullname = cls._package + "." + cls.__name__
+        cls._iris_package = pkg
+        cls._fullname = cls._iris_package + "." + cls.__name__
         cls._field_names, cls._column_field_names = cls._class_body_field_order_top_level()
         # register every user subclass by its __name__. This is later used in Host classes for
         # generating objects dynamically at runtime based on incoming message type...
@@ -724,10 +724,10 @@ class ProductionMessage:
                             
         else:
 
-            package_name = cls._package
+            iris_package_name = cls._iris_package
             class_name = cls.__name__
-            current_package = getattr(iris, package_name)
-            current_class = getattr(current_package, class_name)
+            current_iris_package = getattr(iris, iris_package_name)
+            current_class = getattr(current_iris_package, class_name)
             iris_message_object = current_class._New()
 
             # building using args/kwargs. This is primarily to be used by python side.
