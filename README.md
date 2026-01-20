@@ -64,3 +64,5 @@ Contributions are welcome. Please submit changes via Pull Requests.
 [Quick Start](./docs/quickstart.md)
 
 [Debugging](./docs/debugging.md)
+
+[API Reference](./docs/apireference.md)
