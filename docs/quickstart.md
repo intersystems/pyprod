@@ -30,18 +30,11 @@ from intersystems_pyprod import (
 
 ## Step 2 Package name
 
-In **InterSystems IRIS**, objects are organized into packages. In **intersystems_pyprod**, the attribute **`package_name`** is reserved and can be used to specify the name of the package to which all components defined within a module belong.  
-
-This is important because components created in a Python production script may run in different processes. For the production backend to locate them, each component must have a clearly defined name. The **`package_name`** attribute ensures this. If **`package_name`** is not specified, the production automatically uses the name of the Python script as the package name.  
-
-In this example, **`package_name`** is set at the module level, but it can also be defined at the class level if needed.  
-
-All production components created in the script will appear in the **Production UI** using the format **`package_name.class_name`**.
-
+In **InterSystems IRIS**, objects are organized into `packages`. **`iris_package_name`** is a pyprod-defined configuration variable and can be used to specify the name of the package to which all components defined within a module belong. In this example, **`iris_package_name`** is set at the module level, but it can also be defined at the class level if needed. All production components created in the script will appear in the **Production UI** using the format **`iris_package_name.class_name`**. You can read more about package names [here](./apireference.md#-package-name-project-organization-).
 
 
 ```python
-package_name = "QuickStart"
+iris_package_name = "QuickStart"
 ```
 
 
@@ -49,61 +42,54 @@ package_name = "QuickStart"
 
 The primary function of any production is to **pass messages**. Naturally, the design of a production depends on the types of messages it needs to handle.  
 
-In this example, we define three message types:  
+In this example, we define two message types:  
 
-- **`TempData`** – a Python-only object. This type cannot be transmitted through the message-passing engine callbacks (**`SendRequestSync`**, **`SendRequestAsync`**, or **`SendDeferredResponse`**). However, it can be exchanged between the **Inbound Adapter and Business Service**, as well as between the **Business Operation and Outbound Adapter**.  
+- **`MyJsonData`** and **`MyPickleData`** – these classes inherit from **`JsonSerialize`** and **`PickleSerialize`**, respectively. These superclasses specify the serialization method used for persisting the data contained in the message type. More information on how to create and initialize persistable messages can be found [here](./apireference.md#-persistable-messages-).  
 
-- **`MyJsonData`** and **`MyPickleData`** – these classes inherit from **`JsonSerialize`** and **`PickleSerialize`**, respectively. These superclasses specify the serialization method used for persisting the data contained in the message type. Unlike `TempData`, these messages can be transmitted using all message-passing engine callbacks. More information on how to create and initialize persistable messages can be found [here].  
-
-**Note:** The **`Column()`** decorator used for certain fields in `JsonSerialize` and `PickleSerialize` subclasses indicates that those fields are stored in separate columns within the IRIS database. This design enables users to run SQL queries on those fields and even create indexes for faster lookups.
-[Read more about Columns here](./allcomponents.md).
+**Note:**  **`Column()`** object used for certain fields in `JsonSerialize` and `PickleSerialize` subclasses indicates that those fields are stored in separate columns within the IRIS database. This design enables users to run SQL queries on those fields and even create indexes for faster lookups.
+Read more about Columns [here](./apireference.md#-column-).
 
 ```python
 
-class TempData:
-    def __init__(self, Name: str, Amount: int):
-        self.Name = Name
-        self.Amount = Amount
-
-
 class MyJsonData(JsonSerialize):
-    Name = Column()
-    Amount = Column()
-
+    name: str = Column(index=True)
+    amount = Column(datatype = int)
 
 class MyPickleData(PickleSerialize):
-    Name = Column()
-    Amount = 1
-
+    name = Column()
+    amount = 1
 
 ```
 
 
 ## Step 4: Creating an Inbound Adapter
 
-An inbound adapter is responsible for receiving and validating requests from external systems. Inbound adapter classes work in conjunction with business service classes. Typically, the inbound adapter provides general-purpose, reusable functionality, while the business service implements production-specific logic, such as custom validation or processing rules.
+An inbound adapter is responsible for receiving and validating requests from external systems. The adapter passes the data it receives to a Business Service. This data transfer can take the form of a regular Python object, an InterSystems IRIS object, or a Python message object (e.g., JsonSerialize or PickleSerialize).
 
-The adapter passes the data it receives to a Business Service. This data transfer can take the form of a regular Python object, an InterSystems IRIS object, or a Python message object (e.g., JsonSerialize or PickleSerialize).
+In this example, we pass a Python list to the business service. For more details about the inbound adapter, read [here](./apireference.md#-inbound-adapter-). 
 
-In this example, we create a regular Python object to pass data from the inbound adapter to the business service. This demonstrates that any Python-based adapter will typically receive information as a Python object at the interface. [Read here for more details about the inbound adapter](./allcomponents.md). 
-
-All inbound adapters will use the **`BusinessHost_ProcessInput`** method to pass data to the service. 
+All inbound adapters will use the **`business_host_process_input`** method to pass data to the service. This method just accepts one input and returns a status output.
 
 ```python
 class CustomInAdapter(InboundAdapter):
-    Counter = IRISProperty("int", default=0)
+
+    def __init__(self,iris_host_object):
+        super().__init__(iris_host_object)
+        self.counter = 0
+        # you must preserve the constructor signature defined by the base class 
+        # if you want to define instance variables using __init__. 
+        # DO NOT introduce additional parameters.
+        # Alternatively, you can use IRISProperty to define instance variables of string and numeric types
 
     def OnTask(self):
         status = Status.OK()
         try:
             time.sleep(0.5)
-            msg = TempData("test", self.Counter)
-            status = self.BusinessHost_ProcessInput(msg)
-            self.Counter += 1
+            msg = ["any data type" , "can be shared", "between an adapter and service", self.counter]
+            status = self.business_host_process_input(msg)
+            self.counter += 1
         except Exception as e:
-            error_msg = "ERROR in CustomInAdapter OnTask : "+str(e)
-            IRISLog.Error(error_msg)
-            status = Status.ERROR(error_msg)
+            status, _ = log_error_and_return_status("ERROR in CustomInAdapter OnTask : "+str(e))
         return status
 
 ```
@@ -111,71 +97,80 @@ class CustomInAdapter(InboundAdapter):
 
 ## Step 5: Creating a Business Service
 
-The role of a **Business Service (BS)** is to ensure that the data received from the adapter is packaged as an object type that can be persisted by the production before it is passed to another business host using a **`SendRequest...`** callback. A Business Service also coordinates with the adapter to receive data from external sources, performs any necessary validation on the incoming data, and, if needed, sends a response back to the source.  
+The role of a **Business Service (BS)** is to ensure that the data received from the adapter (or by direct invocation of the service) is packaged as a persistable message before it is passed to another business host using a **`SendRequest...`** method. 
 
-In this example, the Business Service receives data from the adapter as a regular Python object. This is typical when the inbound adapter is also Python-based (though Python and ObjectScript adapters/services can be mixed).  
+In this example, the Business Service receives data from the adapter as a Python object. This is typical when the inbound adapter is also Python-based (though Python and ObjectScript adapters/services can be mixed).  
 
-Here, we also see the use of **`IRISProperty`** and **`IRISParameter`**, which allow us to manage state directly within IRIS and link the class to the UI. **`IRISParameter`** acts as a class constant, while **`IRISProperty`** represents a variable. By configuring the **`setting`** field of an **`IRISProperty`**, we can specify that its value should be provided through the UI, allowing different instances of the class to have unique configurations.
+Here, we also see the use of **`IRISProperty`** and **`IRISParameter`**, which allow us to manage state directly within IRIS and link the class to the UI. **`IRISParameter`** acts as a class constant, while **`IRISProperty`** serve the purpose of an class variable. By configuring the **`settings`** field of an **`IRISProperty`**, we can specify that its value should be provided through the UI, making it behave like an instance variable as multiple instances of the same class can be created in the productio and each instance's IRISProperty values can be different, without affecting the class definition.
+
+Read more about IRISProperty [here](./apireference.md#-irisproperty-)  
+Read more about Business Service [here](./apireference.md#-business-service-)
 
 ```python
 class CustomBS(BusinessService):
 
-    TargetConfigName = IRISProperty(description="Name of Host as seen in the production", settings="TargetConfigName:Target")
+    prop_setting_0 = IRISProperty(default = "does not appear on the UI as settings have not been defined")
+    prop_setting_1  = IRISProperty(default = 45, description = "this appears under Additional Settings", settings="")
+    prop_setting_2  = IRISProperty(settings="MyCategory")
+    prop_setting_3 = IRISProperty(description = "this appears when you click on the property name in the UI", 
+                                  settings="MyCategory:bplSelector")
+    prop_setting_4: int = IRISProperty(settings=":dtlSelector")
 
-    DummyParam = IRISParameter("constant param",description="Used to demostrate parameter use")
-
-    ADAPTER: str = IRISParameter(value="QuickStart.CustomInAdapter", description="Full name as would appear in the backend")
-
-    state_in_python: int = 0
+    target_config_name = IRISProperty(description="Drop down list of possible target hosts under category called Target", 
+                                      settings="Target:selector?context={Ens.ContextSearch/ProductionItems?targets=1&productionName=@productionId}")
+    ADAPTER: str = IRISParameter(value="QuickStart.CustomInAdapter", description="Full name of ADAPTER as would appear in the backend")
 
     def OnProcessInput(self, input):
         status = Status.OK()
-        self.state_in_python = self.state_in_python + 1
-        msg = MyJsonData(input.Name+"BS", input.Amount)
-        status = self.SendRequestSync(self.TargetConfigName, msg)
-        IRISLog.Warning("state in python : " + str(self.state_in_python))
-        IRISLog.Info("this is the dummy param" + str(self.DummyParam))
+        try:
+            persistent_msg = MyJsonData(input[0], input[3])
+            status = self.SendRequestSync(self.target_config_name, persistent_msg)
+            IRISLog.Info("Type of prop_setting_1 is " + str(type(self.prop_setting_1)))
+            IRISLog.Error("displaying how to generate an error message")
+            IRISLog.Status(status)
+            self.prop_setting_1 += 1
+            IRISLog.Warning("prop_setting_1 has been incremented" + str(self.prop_setting_1))
+        except Exception as e:
+            status, _ = log_error_and_return_status("ERROR in CustomBS OnProcessInput : "+str(e))
         return status
+
     
 ```
 
 
-
 ## Step 6: Creating a Business Process
 
-The **Business Process (BP)** is where the core logic of the production resides. It typically receives messages from services, transforms them or creates new messages, and then creates new messages to send to operations. A BP can also send messages to other BPs or even services 
+The **Business Process (BP)** is where the core logic of the production resides. It typically receives messages from services, transforms them or creates new messages, and then sends these to operations. A BP can also send messages to other BPs or even services. 
 
-In this example, we demonstrate the **`OnRequest()`** method. It creates two new message objects to send to another target and uses the **`SendRequestSync`** method to transmit them.
+In this example, we demonstrate the **`OnRequest()`** method. Once it receives an incoming request, it randomly creates a message of either JsonSerialize type or PickleSerialize type, populating it from the input. It then sends this synchronously to the selected target (which is the business operation in this case).
 
 
 ```python
 
 class CustomBP(BusinessProcess):
 
-    TargetConfigName: str = IRISProperty(
-        settings="TargetConfigName:Target:selector?context={Ens.ContextSearch/ProductionItems?targets=1&productionName=@productionId}"
-    )
+    target_config_name = IRISProperty(
+        settings="Target:selector?context={Ens.ContextSearch/ProductionItems?targets=1&productionName=@productionId}")
 
     def OnRequest(self, request):
         status = Status.OK()
-        if random.getrandbits(1):
-            syncRequest = MyJsonData("MyJsonData request from BP to BO", 1)
-        else:
-            syncRequest = MyPickleData("MyPickleData request from BP to BO", 1)
-        status, response = self.SendRequestSync(self.TargetConfigName, syncRequest)
+        try:
+            if random.getrandbits(1):
+                sync_request = MyJsonData(request.name + " json data from BP", request.amount)
+            else:
+                sync_request = MyPickleData(request.name + " pickle data from BP", request.amount)
+            status, response = self.SendRequestSync(self.target_config_name, sync_request)
+        except Exception as e:
+            status, response = log_error_and_return_status("ERROR in CustomBP on_request : "+str(e))
         return status, response
+
 
 ```
 
 ## Step 7: Creating a Business Operation
 
-The **Business Operation (BO)** is responsible for sending requests from the production to external systems via an outbound adapter. Its primary role is to convert information into a format that the outbound adapter can use.  
-
-A Business Operation also includes a **Message Map**, which routes incoming messages to different methods based on their data type.  
-
-In the following example, incoming messages of type **`QuickStart.MyPickleData`** are routed to **`BOmethod1`**, while messages of type **`QuickStart.MyJsonData`** are routed to **`BOmethod2`**.  
-
-When invoking methods of an outbound adapter created using **pyprod**, all arguments must be passed explicitly—even if they are default values. However, if you prefer a more Pythonic experience when calling adapter methods, you can define the outbound adapter as a pure Python object. Since there is no additional layer of persistence or housekeeping between a Business Operation and an outbound adapter, a custom Python class can easily serve as the outbound adapter.
+A **Business Operation (BO)** sends data, either using an outbound adapter, or directly, to the final external target. 
+All the requests routed to a business operation are first assessed for their message type. Then, the method that corresponds to this message type is looked up in a ***message map*** that you define within the opearation class. Finally, this method is used to handle the request. 
 
 
 ```python
@@ -184,21 +179,28 @@ class CustomBO(BusinessOperation):
 
     ADAPTER = IRISParameter("QuickStart.CustomOutAdapter")
     MessageMap = {
-        "QuickStart.MyPickleData": "BOmethod1",
-        "QuickStart.MyJsonData": "BOmethod2",
+        "QuickStart.MyPickleData": "bo_method_1",
+        "QuickStart.MyJsonData": "bo_method_2"
     }
 
-    def BOmethod1(self, request):
+    def bo_method_1(self, request):
         status = Status.OK()
-        IRISLog.Info("Data received at BOmethod1 is: " + request.Name)
-        self.ADAPTER.OutAdapterMethod("From BOmethod1")
-        response = MyPickleData("response from BOmethod1", 0)
+        try:
+            status, out_adapter_response = self.ADAPTER.out_adapter_method_1(" first argument ", parameter2 = " second argument ", python_object = ("third", "argument"))
+            IRISLog.Info("Data received at bo_method_1 is: " + out_adapter_response[0])
+            response = MyJsonData(out_adapter_response[0], out_adapter_response[1])
+        except Exception as e:
+            status, response = log_error_and_return_status("ERROR in CustomBO bo_method_1 : "+str(e))
         return status, response
 
-    def BOmethod2(self, request):
+    def bo_method_2(self, request):
         status = Status.OK()
-        IRISLog.Info("Data received at BOmethod2 is: " + request.Name)
-        response = MyPickleData("response from BOmethod2", 0)
+        try:
+            status = self.ADAPTER.out_adapter_method_2(" first argument ")
+            IRISLog.Info("Data received at bo_method_2 is: " + request.name)
+            response = MyJsonData("response from bo_method_2", 0)
+        except Exception as e:
+            status, response = log_error_and_return_status("ERROR in CustomBO bo_method_2 : "+str(e))
         return status, response
     
 
@@ -206,17 +208,43 @@ class CustomBO(BusinessOperation):
 
 ## Step 8: Creating an OutBound Adapter
 
-An **outbound adapter** handles sending requests to external systems. It serves as a bridge that converts the native programming interface of an external application or database into a format the production can understand. Each external application or database that interacts with a production through a business operation requires its own outbound adapter.
+**Outbound Adapters** act as an interface to external systems. They send the final output to the external system in the format required by that system. The adapter, linked to the business operation using the ADAPTER parameter, is run by the same CPU process as the Business operation.
 
 ```python
 class CustomOutAdapter(OutboundAdapter):
-    def OutAdapterMethod(self, information="default"):
+
+    counter = IRISProperty(0,int)
+
+    def out_adapter_method_1(self, information="default", parameter2 = "parameter2", python_object = ""):
         status = Status.OK()
-        IRISLog.Info("Data received at Outbound Adapter is: " + information)
+        try:
+            IRISLog.Info("All out adapter log messages are displayed in the BO log viewer on the production config page")
+            IRISLog.Info(f"Data received at out_adapter_method_1 is: {information} {parameter2}  {str(python_object)}")
+            response = ("response from out_adapter_method_1", self.counter)
+            self.counter += 1
+        except Exception as e:
+            status, response = log_error_and_return_status("ERROR in CustomOutAdapter out_adapter_method_1 : "+str(e))
+        return status, response
+    
+    def out_adapter_method_2(self, information="default"):
+        status = Status.OK()
+        try:
+            IRISLog.Info("Data received at out_adapter_method_2 is: " + information)
+        except Exception as e:
+            status, _ = log_error_and_return_status("ERROR in CustomOutAdapter out_adapter_method_2 : "+str(e))
         return status
 
 ```
 
+## Helper method to log errors
+
+```python
+def log_error_and_return_status(error_message):
+    IRISLog.Error(error_message)
+    status = Status.ERROR(error_message)
+    response = "error"
+    return status, response
+```
 
 
 [You can see the complete script here](../tests/helpers/QuickStart.py)
