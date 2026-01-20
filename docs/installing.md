@@ -5,23 +5,34 @@ We describe the installation process for containerized instances. Installation a
 ## Setup an IRIS container
 
 We’ll use an **InterSystems IRIS Community Edition** container for testing.
-This setup links a Docker volume to the local filesystem.
 
-#### 1. Start a Container with IRIS
+#### 1. Spin up the Container
 
 ```bash
-docker run -d --name pyprod \
-  -p 1972:1972 -p 52773:52773 \
-  -v .:/opt/pyprodfiles \
-  intersystems/iris-community:2025.1
+docker run -d --name pyprodcontainer -p 1972:1972 -p 52773:52773 intersystems/iris-community:2025.1
 ```
 
 #### 2. Create an Interoperability Namespace in IRIS
 
-When you log in for the first time in an IRIS container, it may prompt you to update the password.
-After that, create an **interoperability-enabled namespace** where you want your production to run.
+- You can access the IRIS Management Portal using this link : ***http://localhost:52773/csp/sys/%25CSP.Portal.Home.zen***.   
+If your container was started using a different port mapping, substitute 52773 in the URL with your configured port.When you log in for the first time in an IRIS container, it may prompt you to update the password.
 
-For this example, we’ll call the namespace **ENSEMBLE**.
+- After that, create an **interoperability-enabled namespace** 
+  ```
+  System > Configuration > Namespaces > Create New Namespace
+  ```
+
+  We’ll call the namespace **ENSEMBLE**.
+
+  You can select ***ENSLIB*** for both the databases
+
+- Make the ENSLIB database read/write
+
+  ```
+  System > Configuration > Local Databases > ENSLIB
+  ```
+  Uncheck *Mount Read-Only*
+
 
 #### 3. Enable Service Callin
 
@@ -48,7 +59,7 @@ We use IRIS that we started in a container above to install pyprod.
 #### 1. Start a bash shell inside the Container
 
 ```bash
-docker exec -it pyprod bash
+docker exec -it pyprodcontainer bash
 ```
 
 #### 2. Create a Virtual Environment
@@ -72,6 +83,8 @@ pip install intersystems_pyprod --target /usr/irissys/mgr/python
 
 #### 5. Set Required Environment Variables
 
+These following environment variables may be defined in a Docker Compose file and do not need to be set for each terminal session.
+
 ```bash
 export IRISINSTALLDIR="/usr/irissys"
 export DYLD_LIBRARY_PATH=$IRISINSTALLDIR/bin:$DYLD_LIBRARY_PATH
@@ -83,19 +96,26 @@ export PYTHONPATH="$IRISINSTALLDIR/lib/python"
 ```
 IRISINSTALLDIR is path to your IRIS installation. For containers, it is usually "/usr/irissys".
 
-`NOTE:` These environment variables may be defined in a Docker Compose file and do not need to be set for each terminal session.
 
 
 ---
 
-## Link Your Python Production to IRIS
+## Link Your Python production components to IRIS
 
-Ensure your `user_script.py` (which contains the Python production) is placed in the local directory linked to Docker.
-Then, run the following command to register and view your components in the IRIS UI:
+Ensure your `user_script.py` (which contains the Python production components defined by you) is placed in the local directory linked to Docker. You can use the following command to do so:
+```
+docker cp <local_source_path> <container_name_or_id>:<container_destination_path> 
+```
+Then, run the following command, in the same shell where you setup the environment variables, to link your components to IRIS and view them in IRIS UI:
 
 ```bash
-intersystems_pyprod user_script.py
+intersystems_pyprod <container_destination_path>/user_script.py
 ```
 
----
+You can view the components on the following page:
+```
+Interoperability > Configure > Productions
+```
+Create a new production and click on the "+" sign next to host names to find your components in the `iris_package_name.class_name` format
+
 
