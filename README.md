@@ -39,7 +39,7 @@ This production reads in a file from a defined path and then forwards it to a ta
 
 Start the Production add then add a text file at the file path defined for the business service. Upon refreshing the production page, we can see the messages that were deliverd. 
 
-[HelloWorldResults](https://github.com/intersystems/pyprod/blob/main/docs/HelloWorldFiles/HelloWorldResults.png?raw=true)
+![HelloWorldResults](https://github.com/intersystems/pyprod/blob/main/docs/HelloWorldFiles/HelloWorldResults.png?raw=true)
 
 
 NOTE: EnsLib.File.PassthroughService is an existing Business Service bundled with IRIS Productions. It loads a file from a given location and passes it forward to the desired target.
