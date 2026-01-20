@@ -7,7 +7,7 @@ intersystems_pyprod is a library that allows you to create different components 
 
 
 ## Example
-The following is a Business Process written using intersystems_pyprod. It just returns the request it receives back to the sender.
+The following is a Business Process written using intersystems_pyprod. It just returns the request it receives, back to the sender.
 
 First follow [steps to setup environment variables](./docs/installing.md) to connect to a running iris instance.
 

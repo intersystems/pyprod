@@ -1,6 +1,6 @@
 [project]
 name = "intersystems_pyprod"
-version = "1.0.0b2"
+version = "1.0.0"
 authors = [
   { name="Geet Kalra", email="geet.kalra@intersystems.com" },
 ]
