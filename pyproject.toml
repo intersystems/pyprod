@@ -1,10 +1,32 @@
 [project]
-name = "intersystems_pyprod"
+name = "intersystems-pyprod"
 version = "1.0.0"
+description = "Pure Python Interoperability Productions using InterSystems IRIS"
+readme = "README.md"
+requires-python = ">=3.9"
 authors = [
   { name="Geet Kalra", email="geet.kalra@intersystems.com" },
 ]
-
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Intended Audience :: Developers",
+]
+license = "MIT"
+license-files = ["LICENSE.txt"]
 
 [project.scripts]
 intersystems_pyprod = "intersystems_pyprod._parser:main"
+
+[project.urls]
+Homepage = "https://github.com/intersystems/pyprod"
+Source = "https://github.com/intersystems/pyprod"
+Issues = "https://github.com/intersystems/pyprod/issues"
+Documentation = "https://github.com/intersystems/pyprod#readme"
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
