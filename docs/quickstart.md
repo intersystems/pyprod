@@ -2,7 +2,7 @@
 
 In the following example, we design a production which sends a Sync request from a Service to Process, which in turn sends a Sync request to an Operation:
 
-<img src="./images/quickstart.png" alt="alt text" width="700"/>
+![quickstart](https://github.com/intersystems/pyprod/blob/main/docs/images/quickstart.png?raw=true)
 
 ## Step 1: Importing libraries and objects
 
@@ -30,7 +30,7 @@ from intersystems_pyprod import (
 
 ## Step 2: Package name
 
-In **InterSystems IRIS**, objects are organized into `packages`. **`iris_package_name`** is a pyprod-defined configuration variable and can be used to specify the name of the package to which all components defined within a module belong. In this example, **`iris_package_name`** is set at the module level, but it can also be defined at the class level if needed. All production components created in the script will appear in the **Production UI** using the format **`iris_package_name.class_name`**. You can read more about package names [here](./apireference.md#-package-name-project-organization-).
+In **InterSystems IRIS**, objects are organized into `packages`. **`iris_package_name`** is a pyprod-defined configuration variable and can be used to specify the name of the package to which all components defined within a module belong. In this example, **`iris_package_name`** is set at the module level, but it can also be defined at the class level if needed. All production components created in the script will appear in the **Production UI** using the format **`iris_package_name.class_name`**. You can read more about package names [here](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md#-package-name-project-organization-).
 
 
 ```python
@@ -44,10 +44,10 @@ The primary function of any production is to **pass messages**. Naturally, the d
 
 In this example, we define two message types:  
 
-- **`MyJsonData`** and **`MyPickleData`** – these classes inherit from **`JsonSerialize`** and **`PickleSerialize`**, respectively. These superclasses specify the serialization method used for persisting the data contained in the message type. More information on how to create and initialize persistable messages can be found [here](./apireference.md#-persistable-messages-).  
+- **`MyJsonData`** and **`MyPickleData`** – these classes inherit from **`JsonSerialize`** and **`PickleSerialize`**, respectively. These superclasses specify the serialization method used for persisting the data contained in the message type. More information on how to create and initialize persistable messages can be found [here](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md#-persistable-messages-).  
 
 **Note:**  **`Column()`** object used for certain fields in `JsonSerialize` and `PickleSerialize` subclasses indicates that those fields are stored in separate columns within the IRIS database. This design enables users to run SQL queries on those fields and even create indexes for faster lookups.
-Read more about Columns [here](./apireference.md#-column-).
+Read more about Columns [here](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md#-column-).
 
 ```python
 
@@ -66,7 +66,7 @@ class MyPickleData(PickleSerialize):
 
 An inbound adapter is responsible for receiving and validating requests from external systems. The adapter passes the data it receives to a Business Service. This data transfer can take the form of a regular Python object, an InterSystems IRIS object, or a Python message object (e.g., JsonSerialize or PickleSerialize).
 
-In this example, we pass a Python list to the business service. For more details about the inbound adapter, read [here](./apireference.md#-inbound-adapter-). 
+In this example, we pass a Python list to the business service. For more details about the inbound adapter, read [here](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md#-inbound-adapter-). 
 
 All inbound adapters will use the **`business_host_process_input`** method to pass data to the service. This method just accepts one input and returns a status output.
 
@@ -97,14 +97,14 @@ class CustomInAdapter(InboundAdapter):
 
 ## Step 5: Creating a Business Service
 
-The role of a **Business Service (BS)** is to ensure that the data received from the adapter (or by direct invocation of the service) is packaged as a persistable message before it is passed to another [business host](./apireference.md#-production-overview-) using a **`SendRequest...`** method. 
+The role of a **Business Service (BS)** is to ensure that the data received from the adapter (or by direct invocation of the service) is packaged as a persistable message before it is passed to another [business host](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md#-production-overview-) using a **`SendRequest...`** method. 
 
 In this example, the Business Service receives data from the adapter as a Python object. This is typical when the inbound adapter is also Python-based (though Python and ObjectScript adapters/services can be mixed).  
 
 Here, we also see the use of **`IRISProperty`** and **`IRISParameter`**, which allow us to manage state directly within IRIS and link the class to the UI. **`IRISParameter`** acts as a class constant, while **`IRISProperty`** serve the purpose of an class variable. By configuring the **`settings`** field of an **`IRISProperty`**, we can specify that its value should be provided through the UI, making it behave like an instance variable as multiple instances of the same class can be created in the productio and each instance's IRISProperty values can be different, without affecting the class definition.
 
-Read more about IRISProperty [here](./apireference.md#-irisproperty-)  
-Read more about Business Service [here](./apireference.md#-business-service-)
+Read more about IRISProperty [here](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md#-irisproperty-)  
+Read more about Business Service [here](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md#-business-service-)
 
 ```python
 class CustomBS(BusinessService):
@@ -247,4 +247,4 @@ def log_error_and_return_status(error_message):
 ```
 
 
-[You can see the complete script here](../tests/helpers/QuickStart.py)
+[You can see the complete script here](https://github.com/intersystems/pyprod/blob/main/tests/helpers/QuickStart.py)

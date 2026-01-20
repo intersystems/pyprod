@@ -2,7 +2,7 @@
 
 This document describes the core building blocks of a production, how they interact with each other, and how to implement them using pyprod.
 
-<div align="center"><img src="./HelloWorldFiles/SystemDiagramOfProductions.png" alt="alt text" width="700"/></div>
+![SystemDiagramOfProductions](https://github.com/intersystems/pyprod/blob/main/docs/HelloWorldFiles/SystemDiagramOfProductions.png?raw=true)
 
 ---
 
@@ -235,7 +235,7 @@ IRISLog.Status(Status.ERROR("error string"))
 ---
 ### <span style="color:#58a6ff"> Debug </span>
 You need to import the debug_host method from pyprod into your python code to link your production to a debugger. 
-The usage is detailed in the [dedicated debugging page](./debugging.md).  
+The usage is detailed in the [dedicated debugging page](https://github.com/intersystems/pyprod/blob/main/docs/debugging.md).  
 
 ---
 ## <span style="color:#2f81f7"> Persistable Messages </span>
@@ -444,7 +444,7 @@ class MyBusinessService(BusinessService):
         return status, response
 ```
 
-**NOTE**: To create an Adapterless business serivce, you do not need to define the ADAPTER parameter. The ADAPTER parameter is only required when the input is to be received from an Inbound Adapter. See [AllPyComponents.py](../tests/helpers/AllPyComponents/AllPyComponents.py) and the test_BOMethod1() method in associated [test_all_py_components.py](../tests/test_all_py_components.py) to see how to use an Adapterless business service
+**NOTE**: To create an Adapterless business serivce, you do not need to define the ADAPTER parameter. The ADAPTER parameter is only required when the input is to be received from an Inbound Adapter. See [AllPyComponents.py](https://github.com/intersystems/pyprod/blob/main/tests/helpers/AllPyComponents/AllPyComponents.py) and the test_BOMethod1() method in associated [test_all_py_components.py](https://github.com/intersystems/pyprod/blob/main/tests/test_all_py_components.py) to see how to use an Adapterless business service
 
 ### <span style="color:#58a6ff"> Business Process </span>
 

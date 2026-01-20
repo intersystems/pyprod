@@ -60,9 +60,6 @@ source .venv/bin/activate
 
 #### 3. Install the Library in the Virtual Environment
 
-> **Note:** As long as this repo is private, `intersystems_pyprod` won’t be available on PyPI.
-> You can download the latest wheel file from /intersystems_pyprod/dist/intersystems_pyprod-1.0.0a3-py3-none-any.whl
-
 ```bash
 pip install intersystems_pyprod
 ```
