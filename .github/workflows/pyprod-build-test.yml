@@ -5,6 +5,7 @@ on:
     paths-ignore: [ '**/*.md', 'docs/**', 'README*', 'CHANGELOG*', 'LICENSE*', '.github/ISSUE_TEMPLATE/**' ]
   pull_request:
     paths-ignore: [ '**/*.md', 'docs/**', 'README*', 'CHANGELOG*', 'LICENSE*', '.github/ISSUE_TEMPLATE/**' ]
+  workflow_dispatch:
 
 permissions:
   contents: read
