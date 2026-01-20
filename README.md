@@ -5,8 +5,6 @@ intersystems_pyprod is a library that allows you to create different components 
 
 <div align="center"><img src="./docs/HelloWorldFiles/SystemDiagramOfProductions.png" alt="alt text" width="700"/></div>
 
-You can [watch a short demo](https://www.youtube.com/watch?v=TJ5zf3FsqjA) that goes over the key aspects of productions and how this library helps capture them. Also, the video gives a quick overview of the debugging workflow. 
-
 
 ## Example
 The following is a Business Process written using intersystems_pyprod. It just returns the request it receives back to the sender.
