@@ -1,6 +1,6 @@
-# InterSystems_PyProd
+# intersystems_pyprod
 
-intersystems_pyprod is a library that allows you to create different components for the InterSystems Productions Framework, purely in python.
+intersystems_pyprod, short for InterSystems Python Productions, is a library that allows you to create different components for the InterSystems Productions Framework, purely in python. Productions provide the integration engine to connect systems that use different communication protocols and different message formats.
 
 
 <div align="center"><img src="./docs/HelloWorldFiles/SystemDiagramOfProductions.png" alt="alt text" width="700"/></div>
@@ -53,7 +53,7 @@ Please report issues via GitHub Issues.
 
 ## Contributing
 
-Contributions are welcome. Please submit changes via Pull Requests. 
+See 
 
 ## Useful links
 
