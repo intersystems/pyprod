@@ -1,10 +1,10 @@
 # Quick Start Guide
 
-In the following example, we design a production which sends a Sync request from a BS to BP, which in turn sends a Sync request to a BO:
+In the following example, we design a production which sends a Sync request from a Service to Process, which in turn sends a Sync request to an Operation:
 
 <img src="./images/quickstart.png" alt="alt text" width="700"/>
 
-## Step 1 Importing libraries and objects
+## Step 1: Importing libraries and objects
 
 First, import all the components that you might need from intersystems_pyprod. Also, import any other python library that you might be using.
 
@@ -28,7 +28,7 @@ from intersystems_pyprod import (
 )
 ```
 
-## Step 2 Package name
+## Step 2: Package name
 
 In **InterSystems IRIS**, objects are organized into `packages`. **`iris_package_name`** is a pyprod-defined configuration variable and can be used to specify the name of the package to which all components defined within a module belong. In this example, **`iris_package_name`** is set at the module level, but it can also be defined at the class level if needed. All production components created in the script will appear in the **Production UI** using the format **`iris_package_name.class_name`**. You can read more about package names [here](./apireference.md#-package-name-project-organization-).
 
@@ -38,7 +38,7 @@ iris_package_name = "QuickStart"
 ```
 
 
-## Step 3 Create the message objects
+## Step 3: Create the message objects
 
 The primary function of any production is to **pass messages**. Naturally, the design of a production depends on the types of messages it needs to handle.  
 
@@ -97,7 +97,7 @@ class CustomInAdapter(InboundAdapter):
 
 ## Step 5: Creating a Business Service
 
-The role of a **Business Service (BS)** is to ensure that the data received from the adapter (or by direct invocation of the service) is packaged as a persistable message before it is passed to another business host using a **`SendRequest...`** method. 
+The role of a **Business Service (BS)** is to ensure that the data received from the adapter (or by direct invocation of the service) is packaged as a persistable message before it is passed to another [business host](./apireference.md#-production-overview-) using a **`SendRequest...`** method. 
 
 In this example, the Business Service receives data from the adapter as a Python object. This is typical when the inbound adapter is also Python-based (though Python and ObjectScript adapters/services can be mixed).  
 
