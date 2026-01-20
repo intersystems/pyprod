@@ -19,7 +19,7 @@ def _detect_repo_root() -> Path:
 @pytest.fixture(scope="module",autouse=True)
 def startprod():
     repo_root = _detect_repo_root()
-    cls_host = repo_root / "tests" / "helpers" / "allPyComponents" / "Production.cls"
+    cls_host = repo_root / "tests" / "helpers" / "AllPyComponents" / "Production.cls"
     if not cls_host.exists():
         raise FileNotFoundError(f"IRIS class file not found: {cls_host}")
 
