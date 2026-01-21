@@ -60,8 +60,8 @@ jobs:
 
           #test
           pip install -U pip pytest
-          pip install "$GITHUB_WORKSPACE/dist/intersystems_pyprod-1.0.0-py3-none-any.whl"
-          pip install "$GITHUB_WORKSPACE/dist/intersystems_pyprod-1.0.0-py3-none-any.whl" --target "/usr/irissys/mgr/python"
+          pip install "$GITHUB_WORKSPACE/dist/intersystems_pyprod-1.0.1-py3-none-any.whl"
+          pip install "$GITHUB_WORKSPACE/dist/intersystems_pyprod-1.0.1-py3-none-any.whl" --target "/usr/irissys/mgr/python"
           intersystems_pyprod "$GITHUB_WORKSPACE/tests/helpers/AllPyComponents/AllPyComponents.py"
           intersystems_pyprod "$GITHUB_WORKSPACE/tests/helpers/OsPyMixed/TCPAdaptersFromOs/TCPAdaptersFromOs.py"
           pytest -vv --maxfail=5 --tb=long tests | tee artifacts/tests.log
