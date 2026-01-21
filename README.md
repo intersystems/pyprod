@@ -62,3 +62,5 @@ See [Contributing guidelines](https://github.com/intersystems/pyprod/blob/main/.
 [Debugging](https://github.com/intersystems/pyprod/blob/main/docs/debugging.md)
 
 [API Reference](https://github.com/intersystems/pyprod/blob/main/docs/apireference.md)
+
+[Changelog] (https://github.com/intersystems/pyprod/blob/main/docs/CHANGELOG.md)
