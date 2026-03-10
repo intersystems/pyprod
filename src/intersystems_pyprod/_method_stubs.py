@@ -39,10 +39,8 @@ Method OnInit() As %Status
 {{
     s status = $$$OK
     try{{
-        set sys = ##class(%SYS.Python).Import("sys")
-        if (sys.path."__getitem__"(0) '= "{ScriptPath}") {{
-           do sys.path.insert(0, "{ScriptPath}")
-        }}
+        set pyprod = ##class(%SYS.Python).Import("intersystems_pyprod")
+        do $method(pyprod,"_add_to_sys_path","{ScriptPath}")
         set PyLib = ##class(%SYS.Python).Import("{ScriptName}")
         set ..PythonClassObject = PyLib.{ClassName}($this)
     }} catch e {{
@@ -66,10 +64,8 @@ Method OnInit() As %Status
 {{
     s status = $$$OK
     try{{
-        set sys = ##class(%SYS.Python).Import("sys")
-        if (sys.path."__getitem__"(0) '= "{ScriptPath}") {{
-           do sys.path.insert(0, "{ScriptPath}")
-        }}
+        set pyprod = ##class(%SYS.Python).Import("intersystems_pyprod")
+        do $method(pyprod,"_add_to_sys_path","{ScriptPath}")
     }} catch e {{
         set status = $system.Status.Error(5001, e.AsSystemError())
         $$$LOGERROR("Error while importing the {Superclass} {ClassName}: "_status)

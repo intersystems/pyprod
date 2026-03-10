@@ -6,6 +6,14 @@ import sys
 
 import iris
 
+_seen_path = set(sys.path)
+
+def _add_to_sys_path(path: str) -> None:
+    if path not in _seen_path:
+        _seen_path.add(path)
+        sys.path.append(path)
+    return
+
 # increasing this to a higher value can lead to <MAXSTRING> error in IRIS
 BELOW_MAX_STRING = 3 * 1024 * 1024
 

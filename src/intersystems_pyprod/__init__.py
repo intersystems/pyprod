@@ -5,7 +5,7 @@ import importlib
 
 __all__ = ["IRISParameter", "IRISProperty", "InboundAdapter", "BusinessService",
           "BusinessProcess","BusinessOperation","OutboundAdapter","ProductionMessage",
-          "Column","JsonSerialize","PickleSerialize","IRISLog","Status","debug_host"]
+          "Column","JsonSerialize","PickleSerialize","IRISLog","Status","debug_host","_add_to_sys_path"]
 
 if TYPE_CHECKING:
     # --- static hints, allows cli tool to run without breaking because of imports ---
