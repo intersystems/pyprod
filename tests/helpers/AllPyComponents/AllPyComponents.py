@@ -33,6 +33,11 @@ class AdapterlessBS(BusinessService):
     
 class CustomBP(BusinessProcess):
     TargetConfigName: str = IRISProperty(settings="Target")
+    myStr = IRISProperty(datatype="str", settings="my settings", default="default string", description="A string property for the process")
+    myInt = IRISProperty(datatype="int", settings="my settings", default=10, description="An integer property for the process")
+    myBool = IRISProperty(datatype="bool", settings="my settings", default=1, description="A boolean property for the process")
+    myNum = IRISProperty(datatype="num", settings="my settings", default=42, description="Number of concurrent tasks for the adapter")
+
     def OnRequest(self, request):
         status = Status.OK()
         if request.name == "testMyJson" :
