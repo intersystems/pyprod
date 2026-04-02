@@ -27,7 +27,7 @@ MESSAGE_SUPERCLASSES = [ "JsonSerialize", "PickleSerialize"]
 
 DATATYPE_MAP = {"str": "%VarString", "int": "%Integer", "bool": "%Boolean", "num":"%Numeric"}
 
-DATATYPE_MAP_Parameters = {"str": "STRING", "int": "INTEGER", "bool": "BOOLEAN", "num":"NUMERIC"}
+DATATYPE_MAP_Parameters = {"str": "STRING", "int": "INTEGER", "bool": "BOOLEAN"}
 
 
 def snake_to_pascal(name: str) -> str:
