@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        iris_image: [ "intersystems/iris-community:2025.2", "intersystems/iris-community:2025.1", "intersystems/iris-community:2024.3" ]
+        iris_image: [ "intersystems/iris-community:2026.1","intersystems/iris-community:2025.2", "intersystems/iris-community:2025.1", "intersystems/iris-community:2024.3" ]
         py: [ "3.9", "3.10", "3.11", "3.12" ]
 
     container:
