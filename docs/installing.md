@@ -65,7 +65,7 @@ export LD_LIBRARY_PATH=$IRISINSTALLDIR/bin:$LD_LIBRARY_PATH
 #### Windows (Powershell)
 
 ```powershell
-$Env:IRISINSTALLDIR="C:\InterSystems\IRIS"
+$Env:IRISINSTALLDIR="C:\path\to\IRIS"
 $Env:IRISUSERNAME="SuperUser"
 $Env:IRISPASSWORD="SYS"
 $Env:IRISNAMESPACE="ENSEMBLE"
@@ -85,4 +85,4 @@ $Env:LD_LIBRARY_PATH="$Env:IRISINSTALLDIR\bin;$Env:LD_LIBRARY_PATH"
 > - The `ENSLIB` database is set to read/write (see [Editing a Local Database's Properties](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GSA_config_database_edit))
 > - The Service Callin feature is enabled (see [GSA_manage_services](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=GSA_manage_services)) 
 >  
-> You can follow the [setup instructions here](https://github.com/intersystems/pyprod/blob/main/docs/setupiriscontainer.md) to configure these settings in your IRIS instance.
+> You can follow the [setup instructions here](https://github.com/intersystems/pyprod/blob/main/docs/setupiriscontainer.md) to configure these settings in your IRIS instance for a container.
