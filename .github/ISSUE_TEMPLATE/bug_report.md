@@ -8,7 +8,6 @@ assignees: ''
 ---
 
 <!-- ⚠️ If you have an InterSystems support contract, please contact InterSystems' Worldwide Response Center (WRC) for support. -->
-<!-- Please read our issue reporting guide: https://docs.intersystems.com/components/csp/docbook/DocBook.UI.Page.cls?KEY=GVSCO_reporting -->
 <!-- 🔎 Search existing issues to avoid creating duplicates. -->
 
 - iris kit details: 'version, build, edition, and container image if applicable'
