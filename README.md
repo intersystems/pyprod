@@ -115,7 +115,7 @@ You can control the production lifecycle and inspect messages using the director
 
 ## Reporting Issues
 
-Please report issues via GitHub Issues.
+If you have an InterSystems support contract, please contact InterSystems' Worldwide Response Center (WRC) for support. Otherwise, use GitHub issues.
 
 ## Contributing 
 
