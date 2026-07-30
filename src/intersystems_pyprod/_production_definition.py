@@ -3,6 +3,16 @@ from typing import Optional
 
 from ._method_stubs import STUBS
 
+
+def _escape_xml(value: str) -> str:
+    s = str(value)
+    s = s.replace("&", "&amp;")
+    s = s.replace("<", "&lt;")
+    s = s.replace(">", "&gt;")
+    s = s.replace('"', "&quot;")
+    return s
+
+
 def _snake_to_pascal(name: str) -> str:
     # Check if the string is in snake_case
     if "_" in name and (name.lower() == name or name.upper() == name):
@@ -181,7 +191,7 @@ class ServiceItem(_HostItem):
     """ 
              
 class ProcessItem(_HostItem):
-    """Declares a business service item in a Production definition.
+    """Declares a business process item in a Production definition.
 
     Parameters
     ----------
@@ -248,7 +258,7 @@ class ProcessItem(_HostItem):
         Overriding by a matching System Default Setting will occur even if this value is defined in the production definition.
     """ 
 class OperationItem(_HostItem):
-    """Declares a business service item in a Production definition.
+    """Declares a business operation item in a Production definition.
 
     Parameters
     ----------
@@ -344,7 +354,7 @@ def _create_item_target_settings(target, host_obj):
 
     item_target_settings = []
     for name, value in getattr(host_obj, f"{target}_settings").items():
-        setting = f"""       <Setting Target="{target.capitalize()}" Name="{_snake_to_pascal(name)}">{value}</Setting>"""
+        setting = f"""       <Setting Target="{target.capitalize()}" Name="{_snake_to_pascal(name)}">{_escape_xml(value)}</Setting>"""
         item_target_settings.append(setting)
   
     return "\n"+"\n".join(item_target_settings) if item_target_settings else ""
@@ -356,7 +366,7 @@ def _create_production_item(cls_obj):
     
     def create_item(item):
         complete_string = f"""
-    <Item Name="{item.name}" Category="{item.category}" ClassName="{item.class_name}" PoolSize="{item.pool_size}" Enabled="{item.enabled}" Foreground="{item.foreground}" Comment="{item.comment}" LogTraceEvents="{item.log_trace_events}" Schedule="{item.schedule}">{_create_item_target_settings("host",item)}{_create_item_target_settings("adapter",item)}
+    <Item Name="{_escape_xml(item.name)}" Category="{_escape_xml(item.category)}" ClassName="{_escape_xml(item.class_name)}" PoolSize="{item.pool_size}" Enabled="{item.enabled}" Foreground="{item.foreground}" Comment="{_escape_xml(item.comment)}" LogTraceEvents="{item.log_trace_events}" Schedule="{_escape_xml(item.schedule)}">{_create_item_target_settings("host",item)}{_create_item_target_settings("adapter",item)}
     </Item>
 """
         return complete_string

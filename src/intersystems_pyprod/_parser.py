@@ -149,6 +149,7 @@ def load_to_iris(cls_string, cls_name):
             "No module named 'iris': You need to set the PYTHONPATH environment variable to point to /iris_install_dir/lib/python"
         )
         print(e)
+        raise SystemExit(1)
 
 
 # _______________________________________________________________________________________________________________________ load_to_iris #
@@ -514,10 +515,11 @@ def extract_props_and_settings(node: ast.ClassDef, real_path, loaded_module):
         datatype = DATATYPE_MAP.get(dtype, '%VarString')
         line = f"Property {prop_name} As {datatype}"
         if default is not None:
+            sanitized_default = " ".join(str(default).splitlines())
             if datatype == "%VarString":
-                line += f' [InitialExpression = "{default}"]'
+                line += f' [InitialExpression = "{sanitized_default}"]'
             else:
-                line += f" [InitialExpression = {default}]"
+                line += f" [InitialExpression = {sanitized_default}]"
 
         line += "; \n"
         props.append(line)

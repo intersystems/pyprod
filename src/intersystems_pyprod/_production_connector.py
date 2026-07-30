@@ -209,15 +209,15 @@ class AdapterNamesToPascal:
             # Wrap method calls so args pass through unchanged
             def method(*args, **kwargs):
                 arguments = (args, kwargs)
-                
-                response = iris.ref()
-                # arguments can be passed in as a single python object as the boundary between 
-                # BO and out adapter can handle %SYS.Python objects..
-                status = attr(arguments,response)
 
-                response_value = response.value
-                response.value = None
-                del response
+                response = iris.ref()
+                try:
+                    status = attr(arguments,response)
+
+                    response_value = response.value
+                finally:
+                    response.value = None
+                    del response
 
                 if isinstance(response_value, tuple):
                     return (status, *response_value)
@@ -368,21 +368,23 @@ class BusinessService(BaseClass):
     def SendRequestSync(self, target_dispatch_name, request, timeout=-1, description=""):
         response = iris.ref()
         send_sync_handling = iris.ref()
-        status = self.iris_host_object.SendRequestSync(
-            target_dispatch_name,
-            self.request_to_send(request),
-            response,
-            timeout,
-            description,
-            send_sync_handling,
-        )
+        try:
+            status = self.iris_host_object.SendRequestSync(
+                target_dispatch_name,
+                self.request_to_send(request),
+                response,
+                timeout,
+                description,
+                send_sync_handling,
+            )
 
-        response_value = response.value
-        response.value = None
-        send_sync_handling_value = send_sync_handling.value
-        send_sync_handling.value = None
-        del response
-        del send_sync_handling
+            response_value = response.value
+            send_sync_handling_value = send_sync_handling.value
+        finally:
+            response.value = None
+            send_sync_handling.value = None
+            del response
+            del send_sync_handling
 
         if send_sync_handling_value is not None:
             if response_value is not None:
@@ -398,14 +400,14 @@ class BusinessService(BaseClass):
                 return status
 
         return status
-    
+
     def send_request_sync(self, target_dispatch_name, request, timeout=-1, description=""):
         return self.SendRequestSync(target_dispatch_name, request, timeout, description)
 
     def SendRequestAsync(self, target_dispatch_name, request, description=""):
         status = self.iris_host_object.SendRequestAsync(target_dispatch_name, self.request_to_send(request), description)
         return status
-    
+
     def send_request_async(self, target_dispatch_name, request, description=""):
         return self.SendRequestAsync(target_dispatch_name, request, description)
 
@@ -472,17 +474,19 @@ class BusinessProcess(BaseClass):
 
     def SendRequestSync(self, target_dispatch_name, request, timeout=-1, description=""):
         response = iris.ref()
-        status = self.iris_host_object.SendRequestSync(target_dispatch_name,self.request_to_send(request),response,timeout,description)
+        try:
+            status = self.iris_host_object.SendRequestSync(target_dispatch_name,self.request_to_send(request),response,timeout,description)
 
-        response_value = response.value
-        response.value = None
-        del response
+            response_value = response.value
+        finally:
+            response.value = None
+            del response
 
         if response_value is not None:
             return status, self._createmessage(message_object=response_value)
         else:
             return status
-        
+
     def send_request_sync(self, target_dispatch_name, request, timeout=-1, description=""):
         return self.SendRequestSync( target_dispatch_name, request, timeout, description)
 
@@ -529,30 +533,32 @@ class BusinessOperation(BaseClass):
 
     def SendRequestSync(self, target_dispatch_name, request, timeout=-1, description=""):
         response = iris.ref()
-        status = self.iris_host_object.SendRequestSync(
-            target_dispatch_name,
-            self.request_to_send(request),
-            response,
-            timeout,
-            description,
-        )
+        try:
+            status = self.iris_host_object.SendRequestSync(
+                target_dispatch_name,
+                self.request_to_send(request),
+                response,
+                timeout,
+                description,
+            )
 
-        response_value = response.value
-        response.value = None
-        del response
+            response_value = response.value
+        finally:
+            response.value = None
+            del response
 
         if response_value is not None:
             return status, self._createmessage(message_object=response_value)
         else:
             return status
-        
+
     def send_request_sync(self, target_dispatch_name, request, timeout=-1, description=""):
         return self.SendRequestSync(target_dispatch_name, request, timeout, description)
 
     def SendRequestAsync(self, target_dispatch_name, request, description=""):
         status = self.iris_host_object.SendRequestAsync(target_dispatch_name, self.request_to_send(request), description)
         return status
-    
+
     def send_request_async(self, target_dispatch_name, request, description=""):
         return self.SendRequestAsync(target_dispatch_name, request, description)
 
@@ -573,21 +579,22 @@ class InboundAdapter(BaseClass):
             raise NotImplementedError("Subclass must implement OnTask or on_task")
     
     def BusinessHost_ProcessInput(self, input, in_hint=""):
-        
+
         output = iris.ref()
         output.value = ""
         temp_hint = in_hint
         hint = iris.ref()
         hint.value = temp_hint
-        status = self.iris_host_object.BusinessHost.ProcessInput(input, output, hint)
+        try:
+            status = self.iris_host_object.BusinessHost.ProcessInput(input, output, hint)
 
-        output_value = output.value
-        output.value = None
-        del output
-
-        hint_value = hint.value
-        hint.value = None
-        del hint
+            output_value = output.value
+            hint_value = hint.value
+        finally:
+            output.value = None
+            del output
+            hint.value = None
+            del hint
 
         if in_hint != "":
             if (output_value is not None) and (output_value != ""):
