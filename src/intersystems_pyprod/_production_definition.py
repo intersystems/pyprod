@@ -1,7 +1,12 @@
 import warnings
 from typing import Optional
+from xml.sax.saxutils import escape
 
 from ._method_stubs import STUBS
+
+def _xml_escape(value) -> str:
+    # Escape text and attribute values so special characters don't break the generated XML
+    return escape(str(value), {'"': "&quot;"})
 
 def _snake_to_pascal(name: str) -> str:
     # Check if the string is in snake_case
@@ -344,7 +349,7 @@ def _create_item_target_settings(target, host_obj):
 
     item_target_settings = []
     for name, value in getattr(host_obj, f"{target}_settings").items():
-        setting = f"""       <Setting Target="{target.capitalize()}" Name="{_snake_to_pascal(name)}">{value}</Setting>"""
+        setting = f"""       <Setting Target="{target.capitalize()}" Name="{_snake_to_pascal(name)}">{_xml_escape(value)}</Setting>"""
         item_target_settings.append(setting)
   
     return "\n"+"\n".join(item_target_settings) if item_target_settings else ""
@@ -356,7 +361,7 @@ def _create_production_item(cls_obj):
     
     def create_item(item):
         complete_string = f"""
-    <Item Name="{item.name}" Category="{item.category}" ClassName="{item.class_name}" PoolSize="{item.pool_size}" Enabled="{item.enabled}" Foreground="{item.foreground}" Comment="{item.comment}" LogTraceEvents="{item.log_trace_events}" Schedule="{item.schedule}">{_create_item_target_settings("host",item)}{_create_item_target_settings("adapter",item)}
+    <Item Name="{_xml_escape(item.name)}" Category="{_xml_escape(item.category)}" ClassName="{_xml_escape(item.class_name)}" PoolSize="{item.pool_size}" Enabled="{item.enabled}" Foreground="{item.foreground}" Comment="{_xml_escape(item.comment)}" LogTraceEvents="{item.log_trace_events}" Schedule="{_xml_escape(item.schedule)}">{_create_item_target_settings("host",item)}{_create_item_target_settings("adapter",item)}
     </Item>
 """
         return complete_string
